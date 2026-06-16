@@ -104,7 +104,7 @@ Skipo/                  (Repo-Wurzel, GitHub Pages)
 ├── style.css           gesamtes CSS                          [ERLEDIGT]
 ├── konfig.js           Modul 01 (DIE Datei zum Tunen)         [ERLEDIGT]
 ├── ki-planner.js       Modul 02 (Planer-Konfig)               [ERLEDIGT]
-├── state.js            Modul 03 + 04                         [offen]
+├── state.js            Modul 03 + 04 (Zustand + Helfer)        [ERLEDIGT]
 ├── engine.js           Modul 05 + 06                         [offen]
 ├── view.js             Modul 07 + 08 + 09                    [offen]
 ├── ai.js               Modul 10–14                           [offen]
@@ -137,8 +137,14 @@ die obersten `let KONFIG` / `const Game` müssen vor allem anderen geladen sein.
        `const KI_PLANNER = {...};` ausgelagert, per `<script src=...ki-planner.js?v=2>`
        vor dem Haupt-Script geladen (global verfügbar, im Inline 15× genutzt).
        Verifiziert: 1 Deklaration, syntaxgeprüft. KONFIG unverändert korrekt.
-4. [ ] `state.js` (Modul 03 + 04) — NÄCHSTER SCHRITT.
-5. [ ] `engine.js` (Modul 05 + 06)
+4. [x] **`state.js`** (Modul 03 + 04) — ERLEDIGT 16.06.2026.
+       Globaler Zustand (`Game`, `currentPlayer`, `spielGeschwindigkeit`,
+       `tunerTracking` u.a.) + Hilfsfunktionen (`pileTopValue`, `cardNumericValue`,
+       `getJokerValue`, `pauseForSeconds`, ...) ausgelagert. Nur Deklarationen/
+       Funktionen, nichts läuft beim Laden. Per `<script src=...state.js?v=2>` vor
+       dem Haupt-Script geladen. Verifiziert: keine Doppel-Deklaration (Globals
+       0×, `topCard`/`previousCard` sind funktionslokal), beide Teile node --check OK.
+5. [ ] `engine.js` (Modul 05 + 06) — NÄCHSTER SCHRITT.
 6. [ ] `view.js` (Modul 07 + 08 + 09)
 7. [ ] `ai.js` (Modul 10–14)
 8. [ ] `endgame.js` (Modul 15 + 16 + 17)
