@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<!--
+  ================================================================
+  SKIP-BO MOBILE - VERSION 7.0.0   (Struktur-Umbau, 16.06.2026)
+  ----------------------------------------------------------------
+  Basis = v6.6.0 (Verhalten/Aussehen/Regeln 1:1 unveraendert).
+  7.0.0 teilt die Einzeldatei in mehrere Dateien auf, damit das
+  Projekt wartbar und erweiterbar bleibt.
+  SCHRITT 1 (erledigt): CSS ausgelagert nach style.css.
+  WICHTIG: style.css muss FLACH neben dieser Datei liegen
+           (Ordner Skipo, KEIN Unterordner).
+  Das JavaScript ist aktuell noch inline; es folgt schrittweise.
+  ================================================================
+-->
+<!--
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           SKIP-BO MOBILE — VERSION 6.6.0                                     ║
+║           Kompletter Neuaufbau: Modul-Struktur + Zugketten-Planer            ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  WAS IST NEU IN v6.6.0:                                                      ║
+║  ──────────────────────────────────────────────────────────────────────────  ║
+║  • NEUAUFBAU: Code in 16 klar getrennte Module umstrukturiert                ║
+║    (Aussehen, Effekte, Spielregeln und Meldungen 1:1 wie v6.5.9)             ║
+║  • NEU Modul 11: Zugketten-Planer – die KI sucht GARANTIERTE                 ║
+║    Zugfolgen (Tiefensuche) für Stockabbau und Hand-Leeren, BEVOR             ║
+║    die getunte Score-Heuristik einzelne Züge bewertet                        ║
+║  • NEU: Sofort-Nachziehen-Regel für die KI – wer alle 5 Handkarten           ║
+║    auf Baustapel spielt, zieht sofort 5 neue (der menschliche                ║
+║    Spieler hatte diese offizielle Regel bereits, die KI nicht!)              ║
+║  • NEU: playInDiscardPiles bewertet ALLE Handkarten × 4 Stapel               ║
+║    (v6.5.9 legte stur die letzte Handkarte ab) – inkl. Schutz für            ║
+║    Karten die Teil einer geplanten Handkette sind                            ║
+║  • NEU 11.6.: 🌐 Sprachumschaltung im Menü – Deutsch, English,               ║
+║    Português, Українська (alle Meldungen, Menüs, Regeln, Endscreen,          ║
+║    Tuner-Auswertung; Auswahl wird gespeichert)                               ║
+║  • FIX 11.6. (kritisch): „Geister-KI" – ein Stock-Prioritätszug              ║
+║    startete den KI-Zug parallel NEU statt ihn abzuwarten; zwei               ║
+║    Stränge spielten gleichzeitig → Baustapel leerten sich scheinbar          ║
+║    grundlos mitten im Spielerzug. Jetzt: awaited Rekursion +                 ║
+║    restarted-Flag + Wurzel-Wächter gegen jeden Doppelstart.                  ║
+║  • FIX 11.6.: Feld-Zähler („Stock (20)", „Bau 1 (1)") waren seit             ║
+║    Spielstart eingefroren – werden jetzt bei jedem Zug live gesetzt          ║
+║  • FIX 10.6.: Blockade-Overlay löschte ganze Baustapel-FELDER –              ║
+║    Aufräumen entfernte das markierte Pile-DIV statt nur der Klasse           ║
+║    (in 6.5.9 maskiert durch defekte Gegner-Vorhersage)                       ║
+║  • FIX: executeStockAttack – reduce-Bug (lieferte Zahl statt Karte)          ║
+║  • FIX: missedStock wird endlich getrackt (Tuner-Wert "Verpasste             ║
+║    Stockzüge" war wegen totem DEBUG_45-Flag immer 0)                         ║
+║  • FIX: joker_analyzeHandJoker – tote DEBUG_J3-Reste verschluckten           ║
+║    alle return-Anweisungen (Funktion gab immer undefined)                    ║
+║  • FIX: predictEnemyStock – Doppel-Subtraktion + falsche Deckgröße           ║
+║    repariert (Blockade-Overlays zeigen jetzt korrekte Prozente)              ║
+║  • FIX: deckComposition als sauberes Objekt {1..12, joker} (156 K.)          ║
+║  • BEREINIGT: Tote DEBUG_40/41/42/45/J3/M2/D1/D4-Reste entfernt              ║
+║    (Flags existieren in KONFIG nicht – Zweige liefen nie)                    ║
+║  • BEIBEHALTEN: Komplette getunte Score-Heuristik (SCORE_1…49),              ║
+║    alle ~100 Funktionsnamen, alle Meldungstexte, Tuner-Auswertung            ║
+║                                                                              ║
+║  MODULVERZEICHNIS:                                                           ║
+║  ──────────────────────────────────────────────────────────────────────────  ║
+║  Modul 01  KONFIG (Tuner-Schnittstelle – Block 1:1 austauschbar)             ║
+║  Modul 02  KI_PLANNER (Planer-Einstellungen, bleibt beim Tausch!)            ║
+║  Modul 03  Globale Variablen & Spielzustand                                  ║
+║  Modul 04  Hilfsfunktionen (Pausen, Karten, Werte)                           ║
+║  Modul 05  Spielinitialisierung (Deck, Verteilen, Tracking)                  ║
+║  Modul 06  Spielregeln & Zug-Engine (isValidBuildMove, Drops)                ║
+║  Modul 07  Rendering & View (updateView, Meldungen)                          ║
+║  Modul 08  Overlay & Einstellungen                                           ║
+║  Modul 09  Spieler-Eingabe (Touch/Klick)                                     ║
+║  Modul 10  KI-Steuerung (Rundenablauf aiTurn_*)                              ║
+║  Modul 11  KI-Zugketten-Planer (NEU v6.6.0)                                  ║
+║  Modul 12  KI-Bewertung & Scoring (getunte Heuristik)                        ║
+║  Modul 13  KI-Analyse & Gegner-Vorhersage                                    ║
+║  Modul 14  Joker-Strategie, Hand-Ketten, Tiefenanalyse                       ║
+║  Modul 15  Spielende, Tracking & Tuner-Auswertung                            ║
+║  Modul 16  Info-Fenster, Schnellmenü & Initialisierung                       ║
+║                                                                              ║
+║  TUNER-WORKFLOW (unverändert):                                               ║
+║  ──────────────────────────────────────────────────────────────────────────  ║
+║  Neue Tuner-Ausgabe einspielen = NUR den "let KONFIG = {…};" Block           ║
+║  in Modul 01 ersetzen. Modul 02 (KI_PLANNER) dabei NICHT löschen.            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+             user-scalable=no, viewport-fit=cover"
+  >
+  <meta name="theme-color"                             content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable"            content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style"   content="black-translucent">
+  <title>Skip-Bo Mobile v7.0.0</title>
+
+  <link rel="stylesheet" href="https://dietertepe.github.io/Skipo/style.css?v=2">
+</head>
+
+<body>
+  <!-- STATUS-BALKEN mit verschiebbarem Label -->
+  <div id="status-label">
+    <span id="status-text">🎮 Spielstart: Karten werden gemischt...</span>
+  </div>
+
+  <!-- ⚙️-MENÜ-BUTTON: separat vom Label damit Drag-Handler ihn nicht blockiert -->
+  <button id="menu-btn" title="Menü öffnen"
+    style="
+      position:      fixed;
+      right:         8px;
+      top:           6px;
+      background:    rgba(255,255,255,0.2);
+      border:        1px solid rgba(255,255,255,0.4);
+      border-radius: 6px;
+      color:         white;
+      font-size:     1rem;
+      padding:       4px 10px;
+      cursor:        pointer;
+      touch-action:  manipulation;
+      line-height:   1.4;
+      z-index:       1050;
+      -webkit-tap-highlight-color: transparent;
+    "
+  >⚙️</button>
+
+  <!-- SCHNELLMENÜ – erscheint bei Klick auf ⚙️ -->
+  <div id="quick-menu" style="
+    display:       none;
+    position:      fixed;
+    top:           44px;
+    right:         8px;
+    background:    rgba(20, 30, 20, 0.97);
+    border:        1px solid rgba(255,255,255,0.25);
+    border-radius: 10px;
+    z-index:       1100;
+    min-width:     200px;
+    box-shadow:    0 6px 20px rgba(0,0,0,0.5);
+    overflow:      hidden;
+  ">
+    <div style="padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:0.8rem; color:rgba(255,255,255,0.5);">
+      Skip-Bo v7.0.0
+    </div>
+    <button class="qm-btn" id="qm-settings" onclick="menuEinstellungen()">⚙️ Einstellungen</button>
+    <button class="qm-btn" id="qm-rules"    onclick="menuSpielregeln()">📖 Spielregeln</button>
+    <button class="qm-btn" id="qm-lang"     onclick="menuSprache()">🌐 Sprache / Language</button>
+    <button class="qm-btn" id="qm-newgame"  onclick="menuNeuesSpiel()">🔄 Neues Spiel</button>
+    <button class="qm-btn" id="qm-tuner"    onclick="menuTunerReset()">📊 Auswertung zurücksetzen</button>
+    <button class="qm-btn" id="qm-close"    onclick="closeQuickMenu()" style="color:rgba(255,100,100,0.9);">✕ Schließen</button>
+  </div>
+
+  <div class="game-container">
+
+    <!-- GEGNER-BEREICH -->
+    <section class="opponent-area">
+      <div class="main-piles">
+        <div class="field stock"  data-label="🗃️ Gegner Stock (20)"></div>
+        <div class="field discard-field" data-label="🗑️ Ablage 1"></div>
+        <div class="field discard-field" data-label="🗑️ Ablage 2"></div>
+        <div class="field discard-field" data-label="🗑️ Ablage 3"></div>
+        <div class="field discard-field" data-label="🗑️ Ablage 4"></div>
+      </div>
+      <div class="hand" id="opponentHand"></div>
+    </section>
+
+    <!-- BAU-BEREICH -->
+    <section class="build-area">
+      <div class="main-piles">
+        <div class="field draw-pile"  data-label="🃏 Nachziehstapel"></div>
+        <div class="field build-pile" data-label="▲ Bau 1 (1)"></div>
+        <div class="field build-pile" data-label="▲ Bau 2 (1)"></div>
+        <div class="field build-pile" data-label="▲ Bau 3 (1)"></div>
+        <div class="field build-pile" data-label="▲ Bau 4 (1)"></div>
+      </div>
+    </section>
+
+    <!-- SPIELER-BEREICH -->
+    <section class="human-area">
+      <div class="main-piles">
+        <div class="field discard-field" data-label="🗑️ Ablage 1"></div>
+        <div class="field discard-field" data-label="🗑️ Ablage 2"></div>
+        <div class="field discard-field" data-label="🗑️ Ablage 3"></div>
+        <div class="field discard-field" data-label="🗑️ Ablage 4"></div>
+        <div class="field stock" data-label=" Spieler Stock (20)"></div>
+      </div>
+      <div class="hand" id="playerHand"></div>
+    </section>
+
+  </div><!-- /.game-container -->
+
+  <div id="info-window" style="display: none;">
+    <table id="info-table"></table>
+  </div>
+
+<script src="https://dietertepe.github.io/Skipo/konfig.js?v=2"></script>
+<script src="https://dietertepe.github.io/Skipo/ki-planner.js?v=2"></script>
+<script src="https://dietertepe.github.io/Skipo/state.js?v=2"></script>
+<script src="https://dietertepe.github.io/Skipo/engine.js?v=2"></script>
+<script src="https://dietertepe.github.io/Skipo/view.js?v=2"></script>
+<script src="https://dietertepe.github.io/Skipo/ai.js?v=2"></script>
+<script src="https://dietertepe.github.io/Skipo/endgame.js?v=2"></script>
+<script>
+// ================================================================
+// ██╗  ██╗ ██████╗ ███╗   ██╗███████╗██╗ ██████╗
+// ██║ ██╔╝██╔═══██╗████╗  ██║██╔════╝██║██╔════╝
+// █████╔╝ ██║   ██║██╔██╗ ██║█████╗  ██║██║  ███╗
+// ██╔═██╗ ██║   ██║██║╚██╗██║██╔══╝  ██║██║   ██║
+// ██║  ██╗╚██████╔╝██║ ╚████║██║     ██║╚██████╔╝
+// ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝
+// ================================================================
+// ================================================================
+// MODUL 01 – KONFIG ist AUSGELAGERT nach konfig.js
+// ================================================================
+// Der "let KONFIG = { ... };" Block liegt jetzt in der externen
+// Datei konfig.js und wird oben per <script src="...konfig.js">
+// VOR diesem Haupt-Script geladen. KONFIG ist dadurch global
+// verfuegbar. Zum Tunen/Anpassen NUR konfig.js bearbeiten.
+// ================================================================
+
+
+
+// ================================================================
+// MODUL 02 – KI_PLANNER ist AUSGELAGERT nach ki-planner.js
+// ================================================================
+// Der "const KI_PLANNER = { ... };" Block liegt jetzt in der
+// externen Datei ki-planner.js und wird oben per
+// <script src="...ki-planner.js"> VOR diesem Haupt-Script geladen.
+// KI_PLANNER ist dadurch global verfuegbar.
+// ================================================================
+
+
+
+// ================================================================
+// MODUL 03 + 04 – AUSGELAGERT nach state.js
+// ================================================================
+// Globaler Spielzustand (Game, currentPlayer, spielGeschwindigkeit,
+// tunerTracking u.a.) UND die zentralen Hilfsfunktionen
+// (cardNumericValue, pileTopValue, nextNeededOnPile, getJokerValue,
+// pauseForSeconds, ...) liegen jetzt in state.js und werden oben
+// per <script src="...state.js"> VOR diesem Haupt-Script geladen.
+// ================================================================
+
+
+// ================================================================
+// MODUL 05 + 06 – AUSGELAGERT nach engine.js
+// ================================================================
+// Spielinitialisierung (initGame, buildDeck, dealCards, ...) und
+// Spielregeln/Zug-Engine (isValidBuildMove, handleBuildPileDrop,
+// handleDiscardPileDrop, ...) liegen jetzt in engine.js und werden
+// oben per <script src="...engine.js"> VOR diesem Haupt-Script geladen.
+// ================================================================
+
+
+// ================================================================
+// MODUL 07 + 08 + 09 – AUSGELAGERT nach view.js
+// ================================================================
+// View/Rendering (updateView, ...), Overlay/Einstellungen und
+// Spieler-Eingabe/Touch liegen jetzt in view.js und werden oben
+// per <script src="...view.js"> VOR diesem Haupt-Script geladen.
+// ================================================================
+
+
+// ================================================================
+// MODUL 10–14 – AUSGELAGERT nach ai.js
+// ================================================================
+// Komplette KI (Steuerung aiTurn, Zugketten-Planer, Scoring,
+// Analyse, Joker-Strategie) sowie der Waechter 'aiTurnActive'
+// liegen jetzt in ai.js und werden oben per <script src="...ai.js">
+// VOR diesem Haupt-Script geladen.
+// ================================================================
+
+
+// ================================================================
+// MODUL 15 + 16 + 17 – AUSGELAGERT nach endgame.js
+// ================================================================
+// Spielende/Tracking, Info/Schnellmenue/Initialisierung und das
+// Sprachmodul liegen jetzt in endgame.js, das als LETZTES externes
+// Script (nach ai.js) oben geladen wird und das Spiel startet.
+//
+// >>> Damit ist die KOMPLETTE Spiellogik ausgelagert. <<<
+// Dieses Inline-<script> enthaelt nur noch diese Uebersicht.
+// ================================================================
+
+</script>
+</body>
+</html>
