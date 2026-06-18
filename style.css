@@ -1,0 +1,519 @@
+/* ============================================================
+   Skip-Bo Mobile - Stylesheet  (style.css)
+   Version 7.0.0 - ausgelagert aus SkipBo_6_6_0.html (16.06.2026)
+   Inhalt 1:1 wie v6.6.0 - nur verschoben, inhaltlich nichts geaendert.
+   Diese Datei MUSS direkt neben SkipBo_7_0_0.html liegen (kein Unterordner).
+   ============================================================ */
+
+/* ============================================================ */
+/* BASIS-RESET & BOX-SIZING                                     */
+/* ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin:      0;
+  padding:     0;
+  height:      100%;
+  width:       100%;
+  background:  #1B5E20;
+  color:       white;
+  font-family: Arial, sans-serif;
+  overflow:    hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================ */
+/* INFOLABEL – vollbreitig, fixiert, verschiebbar               */
+/* ============================================================ */
+/* ── STATUS-LABEL v6.5.8: verschiebbarer Infobalken ── */
+#status-label {
+  position:        fixed;
+  top:             0;
+  left:            0;
+  width:           100%;
+  max-width:       100%;
+  background:      rgba(46, 125, 50, 0.94);
+  padding:         8px 50px 8px 10px; /* rechts Platz für separierten ⚙️-Button */
+  text-align:      center;
+  font-size:       0.95rem;
+  font-weight:     500;
+  z-index:         1000;
+  cursor:          grab;
+  user-select:     none;
+  box-shadow:      0 3px 8px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  border-bottom:   1px solid rgba(255, 255, 255, 0.2);
+  border-radius:   0 0 8px 8px;
+  white-space:     nowrap;
+  overflow:        hidden;
+  text-overflow:   ellipsis;
+  transform:       none;
+}
+
+#status-label:active {
+  cursor: grabbing;
+}
+
+/* ── SCHNELLMENÜ-BUTTONS ── */
+.qm-btn {
+  display:      block;
+  width:        100%;
+  padding:      12px 16px;
+  background:   transparent;
+  border:       none;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  color:        white;
+  font-size:    0.95rem;
+  text-align:   left;
+  cursor:       pointer;
+  touch-action: manipulation;
+  transition:   background 0.15s;
+}
+.qm-btn:active {
+  background: rgba(255,255,255,0.12);
+}
+.qm-btn:last-child {
+  border-bottom: none;
+}
+
+/* ============================================================ */
+/* GAME CONTAINER – 9:16-Proportion, responsive                 */
+/* ============================================================ */
+.game-container {
+  aspect-ratio:    9 / 16;
+  height:          100dvh;
+  width:           min(100vw, calc(100dvh * 9 / 16));
+  margin:          0 auto;
+  background:      transparent;
+  display:         flex;
+  flex-direction:  column;
+  overflow:        hidden;
+  padding-top:     42px; /* Platz für fixierten Infobalken */
+  position:        relative;
+}
+
+/* ============================================================ */
+/* BEREICHE – exakte Flex-Verteilung für 5 gleiche Kartenreihen */
+/* ============================================================ */
+.opponent-area {
+  flex:           2;
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+  padding:        4px 4px 2px;
+  min-height:     0;
+}
+
+.build-area {
+  flex:             1;
+  display:          flex;
+  flex-direction:   column;
+  justify-content:  center;
+  padding:          4px;
+  min-height:       0;
+}
+
+.human-area {
+  flex:           2;
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+  padding:        2px 4px 4px;
+  min-height:     0;
+}
+
+/* ============================================================ */
+/* REIHEN & HÄNDE – je 1/5 der verfügbaren Höhe                 */
+/* ============================================================ */
+.main-piles,
+.hand {
+  flex:                    1;
+  min-height:              0;
+  display:                 grid;
+  grid-template-columns:   repeat(5, 1fr);
+  gap:                     4px;
+  align-items:             center;
+  justify-items:           center;
+  width:                   100%;
+}
+
+/* ============================================================ */
+/* KARTEN & FELDER                                              */
+/* ============================================================ */
+.field {
+  background:      transparent;
+  border:          none;
+  border-radius:   8px;
+  display:         flex;
+  justify-content: center;
+  align-items:     center;
+  position:        relative;
+  overflow:        hidden;
+  perspective:     1000px;
+  width:           100%;
+  height:          100%;
+}
+
+/* Erhabener 3D-Bevel-Rahmen (Variante C) für die leeren Felder.
+   Gilt nur für die ÄUSSEREN Felder – die innere Karte/„Leer" bleibt rahmenlos,
+   dadurch ist der frühere gestrichelte Doppelrahmen weg. */
+.discard-field,
+.build-pile,
+.draw-pile {
+  background:    linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.03));
+  border-top:    1px solid rgba(255,255,255,.32);
+  border-left:   1px solid rgba(255,255,255,.18);
+  border-right:  1px solid rgba(0,0,0,.30);
+  border-bottom: 2px solid rgba(0,0,0,.42);
+  box-shadow:    0 2px 5px rgba(0,0,0,.30);
+}
+
+/* Stock: nur der Variante-C-Untergrund. Der animierte „leitende Ring"
+   (Rahmen via .animated-stock-border / .static-stock-border) bleibt erhalten. */
+.field.stock {
+  background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.03));
+}
+
+.card {
+  border:          4px solid #fff !important;
+  border-radius:   10px;
+  aspect-ratio:    2 / 3;
+  width:           100% !important;
+  height:          auto !important;
+  max-height:      100%;
+  margin:          auto;
+  display:         flex;
+  flex-direction:  column;
+  justify-content: space-between;
+  padding:         0;
+  position:        relative;
+  transform-style: preserve-3d;
+  transition:      transform 0.5s, box-shadow 0.5s;
+  box-shadow:      0 2px 6px rgba(0, 0, 0, 0.45);
+  background:      #8a8f96;
+  color:           #fff;
+}
+
+.card.selected {
+  transform: translateY(-40px) rotateY(15deg) rotateX(10deg);
+  animation:
+    neon-pulse  1.5s infinite alternate,
+    card-float  2s   infinite;
+}
+
+.card.backface {
+  background:       #fff !important;
+  display:          flex;
+  flex-direction:   column;
+  align-items:      center;
+  justify-content:  space-between;
+  padding:          7% 6%;
+  animation:        none;
+}
+.back-bar {
+  width:         82%;
+  height:        21%;
+  flex:          0 0 auto;
+  border-radius: 6px;
+  background:    linear-gradient(135deg, #7ec24a, #4e9a2f);
+  box-shadow:    inset 0 0 5px rgba(0, 0, 0, 0.18);
+}
+.back-logo {
+  font-family:         "Arial Black", Arial, sans-serif;
+  font-weight:         900;
+  font-style:          italic;
+  font-size:           1rem;
+  line-height:         0.9;
+  text-align:          center;
+  color:               #F4C430;
+  -webkit-text-stroke: 1.2px #34206e;
+  paint-order:         stroke fill;
+  text-shadow:         0 2px 2px rgba(0, 0, 0, 0.3);
+  transform:           rotate(-7deg);
+}
+
+.card-corner {
+  position:    absolute;
+  font-family: "Arial Black", Arial, sans-serif;
+  font-size:   0.95rem;
+  font-weight: 900;
+  color:       #fff;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.card-corner.top-left     { top: 6px;    left:  7px; }
+.card-corner.top-right    { top: 6px;    right: 7px; }
+.card-corner.bottom-left  { bottom: 6px; left:  7px; transform: rotate(180deg); }
+.card-corner.bottom-right { bottom: 6px; right: 7px; transform: rotate(180deg); }
+
+/* SKIP-BO-Logo (Joker-Karte) */
+.skipbo-logo {
+  font-family:         "Arial Black", Arial, sans-serif;
+  font-weight:         900;
+  font-style:          italic;
+  color:               #F4C430;
+  -webkit-text-stroke: 1.2px #34206e;
+  paint-order:         stroke fill;
+  text-shadow:         0 2px 2px rgba(0, 0, 0, 0.3);
+  letter-spacing:      -1px;
+}
+.skipbo-logo.big-logo {
+  position:   absolute;
+  top:        50%;
+  left:       50%;
+  transform:  translate(-50%, -50%) rotate(-7deg);
+  font-size:  1.25rem;
+  text-align: center;
+  line-height: 0.9;
+}
+.skipbo-logo.mini {
+  position:            absolute;
+  font-size:           0.5rem;
+  font-style:          normal;
+  color:               #fff;
+  -webkit-text-stroke: 0;
+  text-shadow:         0 1px 1px rgba(0, 0, 0, 0.3);
+}
+.skipbo-logo.mini.tl { top: 6px;    left:  7px; }
+.skipbo-logo.mini.br { bottom: 6px; right: 7px; transform: rotate(180deg); }
+
+.card-middle {
+  position:       absolute;
+  top:            50%;
+  left:           50%;
+  transform:      translate(-50%, -50%);
+  font-family:    "Arial Black", Arial, sans-serif;
+  font-size:      2.2rem;
+  font-weight:    900;
+  color:          #fff;
+  letter-spacing: -1px;
+  line-height:    1;
+  text-shadow:    0 2px 3px rgba(0, 0, 0, 0.30);
+}
+
+.human-area    .field.stock .card,
+.opponent-area .field.stock .card,
+.build-area    .field.draw-pile .card {
+  width:      100%;
+  height:     auto;
+  max-height: 100%;
+}
+
+/* ============================================================ */
+/* KARTENFARBEN                                                  */
+/* ============================================================ */
+.card:not(.backface)[data-value="1"],
+.card:not(.backface)[data-value="2"],
+.card:not(.backface)[data-value="3"],
+.card:not(.backface)[data-value="4"] {
+  background:
+    repeating-conic-gradient(from -10deg at 50% 44%,
+      rgba(255,255,255,.14) 0deg 4deg, rgba(255,255,255,0) 4deg 9deg),
+    radial-gradient(circle at 50% 44%, #4f8fd6 0%, #1f60a8 52%, #123f73 100%) !important;
+}
+
+.card:not(.backface)[data-value="5"],
+.card:not(.backface)[data-value="6"],
+.card:not(.backface)[data-value="7"],
+.card:not(.backface)[data-value="8"] {
+  background:
+    repeating-conic-gradient(from -10deg at 50% 44%,
+      rgba(255,255,255,.14) 0deg 4deg, rgba(255,255,255,0) 4deg 9deg),
+    radial-gradient(circle at 50% 44%, #46b864 0%, #1f8a3e 52%, #115e28 100%) !important;
+}
+
+.card:not(.backface)[data-value="9"],
+.card:not(.backface)[data-value="10"],
+.card:not(.backface)[data-value="11"],
+.card:not(.backface)[data-value="12"] {
+  background:
+    repeating-conic-gradient(from -10deg at 50% 44%,
+      rgba(255,255,255,.14) 0deg 4deg, rgba(255,255,255,0) 4deg 9deg),
+    radial-gradient(circle at 50% 44%, #db5446 0%, #bf2f25 52%, #8a1c15 100%) !important;
+}
+
+.card:not(.backface)[data-type="joker"] {
+  background:
+    repeating-conic-gradient(from -10deg at 50% 44%,
+      rgba(255,255,255,.14) 0deg 4deg, rgba(255,255,255,0) 4deg 9deg),
+    radial-gradient(circle at 50% 44%, #f3a64f 0%, #e07f22 52%, #b85e10 100%) !important;
+}
+
+/* ============================================================ */
+/* ANIMATIONEN                                                   */
+/* ============================================================ */
+@keyframes card-glow {
+  from { box-shadow: 0 0  5px #1565C0; }
+  to   { box-shadow: 0 0 15px #0D47A1; }
+}
+
+@keyframes neon-pulse {
+  from {
+    box-shadow:
+      0 0 10px #FFD700, 0 0 20px #FFD700,
+      0 0 30px #FFD700, 0 0 40px #FFD700;
+  }
+  to {
+    box-shadow:
+      0 0 20px #FFD700, 0 0 30px #FFD700,
+      0 0 40px #FFD700, 0 0 50px #FFD700;
+  }
+}
+
+@keyframes card-float {
+  0%   { transform: translateY(   0); }
+  50%  { transform: translateY(-20px); }
+  100% { transform: translateY(   0); }
+}
+
+@keyframes card-drop {
+  0%   { transform: translateY(-40px) rotateY(15deg) rotateX(10deg); }
+  100% { transform: translateY(   0)  rotateY( 0deg) rotateX( 0deg); }
+}
+
+/* ============================================================ */
+/* LABEL-STILE & INFO-FENSTER                                    */
+/* ============================================================ */
+.field::after {
+  content:       attr(data-label);
+  position:      absolute;
+  bottom:        4px;
+  left:          2px;
+  right:         2px;
+  font-size:     0.65rem;
+  color:         rgba(255, 255, 255, 0.9);
+  text-align:    center;
+  padding:       2px;
+  background:    rgba(0, 0, 0, 0.4);
+  border-radius: 3px;
+}
+
+/* Beschriftung ausblenden, sobald eine Karte im Feld liegt (Ablage & Bau) –
+   dadurch wirken gefüllte Felder deutlich sauberer. */
+.discard-field:has(.card)::after,
+.build-pile:has(.card)::after {
+  display: none;
+}
+
+/* Stock & Nachziehstapel: untere Beschriftung immer aus.
+   Die Menge steht stattdessen dezent oben auf der Karte. */
+.field.stock::after,
+.draw-pile::after {
+  display: none;
+}
+
+.field.card.selected {
+  box-shadow: 0 0 15px #FFD700, 0 0 30px #FFD700 inset;
+  transform:  translateY(-40px) rotateY(15deg) rotateX(10deg) scale(1.05);
+  animation:
+    neon-pulse 1.5s infinite alternate,
+    card-float 2s   infinite;
+  transition: all 0.3s ease;
+}
+
+.field.card.placed {
+  animation: card-drop 1s forwards;
+}
+
+.field.card {
+  transition:   all 0.3s ease;
+  touch-action: manipulation;
+}
+
+.joker-number {
+  position:         absolute;
+  top:              5px;
+  left:             50%;
+  transform:        translateX(-50%);
+  font-size:        0.8em;
+  color:            black;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding:          1px 3px;
+  border-radius:    2px;
+}
+
+#info-window {
+  position:      absolute;
+  top:           -300px;
+  left:          50%;
+  transform:     translateX(-50%);
+  background:    #000;
+  color:         white;
+  padding:       15px;
+  text-align:    center;
+  font-size:     1.2rem;
+  z-index:       1001;
+  box-shadow:    0 4px 8px rgba(0, 0, 0, 0.2);
+  width:         80%;
+  max-width:     600px;
+  display:       none;
+}
+
+#info-table {
+  width:           100%;
+  border-collapse: collapse;
+  margin:          0 auto;
+}
+
+#info-table td {
+  border:     1px solid #ddd;
+  padding:    8px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stock-count {
+  position:         absolute;
+  top:              5px;
+  left:             50%;
+  transform:        translateX(-50%);
+  font-size:        0.8em;
+  color:            black;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding:          1px 3px;
+  border-radius:    2px;
+  z-index:          1;
+}
+
+/* ============================================================ */
+/* KI-OVERLAYS & STRATEGIE-TAGS                                  */
+/* ============================================================ */
+.ai-prediction-overlay {
+  position:       absolute;
+  top:            -2px;
+  left:           -2px;
+  right:          -2px;
+  bottom:         -2px;
+  border:         2px solid #ff4444;
+  border-radius:  8px;
+  animation:      prediction-pulse 1.8s ease-in-out infinite;
+  pointer-events: none;
+  z-index:        999;
+  box-shadow:     0 0 12px rgba(255, 68, 68, 0.3);
+}
+
+@keyframes prediction-pulse {
+  0%   { opacity: 0.4; transform: scale(0.98); }
+  50%  { opacity: 0.9; transform: scale(1.02); }
+  100% { opacity: 0.4; transform: scale(0.98); }
+}
+
+.strategy-tag {
+  position:        absolute;
+  bottom:          calc(100% + 5px);
+  left:            50%;
+  transform:       translateX(-50%);
+  background:      rgba(40, 40, 40, 0.9);
+  color:           #fff;
+  padding:         4px 12px;
+  border-radius:   15px;
+  font-size:       0.85em;
+  font-weight:     bold;
+  white-space:     nowrap;
+  backdrop-filter: blur(2px);
+  z-index:         1001;
+  box-shadow:      0 3px 6px rgba(0, 0, 0, 0.2);
+}
