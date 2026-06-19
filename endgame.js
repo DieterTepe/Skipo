@@ -1,0 +1,1453 @@
+// ================================================================
+//  endgame.js  –  Skip-Bo Mobile  (Modul 15 + 16 + 17)
+//  SPIELENDE/TRACKING + INFO/SCHNELLMENUE/INITIALISIERUNG + SPRACHE
+// ----------------------------------------------------------------
+//  Modul 15: Siegpruefung, Endscreen, Tracking, Tuner-Auswertung.
+//  Modul 16: Info-Fenster, Schnellmenue UND die INITIALISIERUNG.
+//            -> Spielstart via DOMContentLoaded -> initGame().
+//  Modul 17: Sprachmodul (DE/EN/PT/UK).
+//  WICHTIG: Diese Datei MUSS als LETZTES externes Script geladen
+//  werden (nach ai.js), da ihr Top-Level-Code Funktionen aus allen
+//  anderen Modulen referenziert und das Spiel startet. Laeuft am
+//  Body-Ende, daher existiert das DOM (.discard-field etc.) bereits.
+// ================================================================
+
+// ================================================================
+// MODUL 15 – SPIELENDE, TRACKING & TUNER-AUSWERTUNG
+// ================================================================
+// Siegprüfung, Endscreen, Beobachtungs-Tracking (localStorage
+// 'skipbo_observations', max. 10 Spiele) und die 5-Spiele-
+// Tuner-Auswertung (localStorage 'skipbo_tuner_tracking').
+// Alle Texte, Schwellenwerte und das Endscreen-HTML sind 1:1
+// aus v6.5.9 übernommen.
+// ================================================================
+
+/**
+ * checkForWinner() – Siegbedingung prüfen.
+ * Wer zuerst seinen Stock leer hat, gewinnt.
+ * @returns {boolean} true wenn Spiel beendet
+ */
+function checkForWinner() {
+  if (isGameOver) return true;
+
+  if (Game.players.human.stock.length === 0) {
+    const aiPoints = Game.players.ai.stock.length * 5;
+    endGame(playerName, 'KI', aiPoints);
+    return true;
+  }
+  if (Game.players.ai.stock.length === 0) {
+    const humanPoints = Game.players.human.stock.length * 5;
+    endGame('KI', playerName, humanPoints);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * endGame(winner, loser, points) – Spiel beenden.
+ * Verhindert Doppelaufrufe durch isGameOver-Flag.
+ * @param {string} winner – Name des Gewinners
+ * @param {string} loser  – Name des Verlierers
+ * @param {number} points – Punkte des Verlierers
+ */
+function endGame(winner, loser, points) {
+  if (isGameOver) return; // Doppelaufruf verhindern
+  isGameOver = true;
+
+  const analysis = trackGameObservations('gameEnd', {
+    winner:         winner,
+    loserStockSize: Game.players[loser === 'KI' ? 'ai' : 'human'].stock.length
+  });
+  showEndGameMessage(winner, loser, points, analysis);
+
+  // Spielfeld deaktivieren
+  const gc = document.querySelector('.game-container');
+  if (gc) gc.style.pointerEvents = 'none';
+}
+
+/**
+ * showEndGameMessage(winner, loser, points, analysis) – Endscreen anzeigen.
+ * Zeigt Spielergebnis, Statistik und Exportmöglichkeit.
+ * Mobile-optimiert: zIndex 3000, pointer-events auto.
+ */
+function showEndGameMessage(winner, loser, points, analysis) {
+  const overlay = document.createElement('div');
+  overlay.id = 'end-game-overlay';
+
+  Object.assign(overlay.style, {
+    position:        'fixed',
+    top:             '5vh',
+    left:            '0',
+    width:           '100vw',
+    height:          '90vh',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    display:         'flex',
+    flexDirection:   'column',
+    justifyContent:  'flex-start',
+    alignItems:      'center',
+    color:           'white',
+    fontSize:        '2em',
+    fontWeight:      'bold',
+    zIndex:          '3000',
+    textAlign:       'center',
+    overflowY:       'auto',
+    paddingTop:      '20px',
+    paddingBottom:   'env(safe-area-inset-bottom)',
+    pointerEvents:   'auto'
+  });
+
+  // Auswertungs-Button-Status ermitteln
+  const spieleGesammelt = tunerTracking.spiele;
+  const auswertungBereit = spieleGesammelt >= 5;
+  const btnAuswertungLabel = auswertungBereit
+    ? t('btnTunerReady', spieleGesammelt)
+    : t('btnTunerWait', 5 - spieleGesammelt);
+
+  overlay.innerHTML = `
+    <div style="
+      background:     #1a1d24;
+      color:          #e0e0e0;
+      padding:        28px;
+      border-radius:  14px;
+      box-shadow:     0 0 30px rgba(0, 212, 255, 0.2);
+      border:         1px solid rgba(0, 212, 255, 0.3);
+      position:       relative;
+      width:          88%;
+      max-width:      560px;
+      pointer-events: auto;
+    ">
+      <!-- ERGEBNIS -->
+      <h1 style="font-size:1.6em; text-align:center; margin:0 0 16px; color:#ffd700;">
+        ${t('endTitle')}
+      </h1>
+      <div style="
+        background:    rgba(255,255,255,0.06);
+        border-radius: 10px;
+        padding:       14px 18px;
+        margin-bottom: 18px;
+        font-size:     1em;
+        line-height:   1.8;
+      ">
+        <div>🏆 <strong>${t('winner')}:</strong> ${winner} 🎉</div>
+        <div>💀 <strong>${t('loser')}:</strong> ${loser} ${t('withPoints', points)}</div>
+      </div>
+
+      <!-- BUTTONS -->
+      <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+        <button id="btn-restart" style="
+          flex:1; min-width:120px; padding:12px;
+          background:linear-gradient(135deg,#4CAF50,#2e7d32);
+          color:white; border:none; border-radius:8px;
+          font-size:0.9em; font-weight:bold; cursor:pointer;
+          touch-action:manipulation;
+        ">${t('btnNewGame')}</button>
+        <button id="btn-auswertung" style="
+          flex:1; min-width:120px; padding:12px;
+          background:${auswertungBereit ? 'linear-gradient(135deg,#00d4ff,#00b36b)' : 'rgba(255,255,255,0.1)'};
+          color:${auswertungBereit ? '#000' : '#8b9bb4'};
+          border:none; border-radius:8px;
+          font-size:0.85em; font-weight:bold; cursor:${auswertungBereit ? 'pointer' : 'default'};
+          touch-action:manipulation;
+        ">${btnAuswertungLabel}</button>
+      </div>
+
+      <!-- TUNER-AUSWERTUNG (initial versteckt) -->
+      <div id="tuner-panel" style="display:none;">
+        <div style="
+          background:  rgba(0,0,0,0.3);
+          border:      1px solid rgba(0,212,255,0.2);
+          border-radius: 10px;
+          padding:     14px;
+          max-height:  340px;
+          overflow-y:  auto;
+        ">
+          ${generateTunerAnalysis()}
+        </div>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  // Neues Spiel
+  document.getElementById('btn-restart').addEventListener('click', e => {
+    e.preventDefault();
+    document.body.removeChild(overlay);
+    location.reload();
+  });
+
+  // Tuner-Auswertung ein-/ausblenden
+  document.getElementById('btn-auswertung').addEventListener('click', e => {
+    e.preventDefault();
+    if (!auswertungBereit) return;
+    const panel = document.getElementById('tuner-panel');
+    if (panel) {
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+  });
+}
+
+/**
+ * trackGameObservations(eventType, data) – Spielzüge für Analyse speichern.
+ * Speichert alle relevanten Spielereignisse in localStorage.
+ * Maximal 10 Spiele werden gespeichert (dann Reset).
+ * @param {string} eventType – Art des Ereignisses
+ * @param {Object} data – Ereignis-Daten
+ * @returns {string|null} Analyse-Text bei 'gameEnd', sonst null
+ */
+function trackGameObservations(eventType, data) {
+  let storedData = JSON.parse(localStorage.getItem('skipbo_observations')) || { games: [], count: 0 };
+  const maxGames = 10;
+  let observations = { gameId: currentGameId };
+
+  switch (eventType) {
+    case 'discardStrategy':
+      observations.type          = 'discardStrategy';
+      observations.cardValue     = data.cardValue;
+      observations.dangerous     = data.wasDangerous;
+      observations.sequenceValue = data.createdSequence;
+      observations.timestamp     = Date.now();
+      break;
+
+    case 'jokerStrategicUse':
+      observations.type         = 'jokerStrategicUse';
+      observations.jokerValue   = data.jokerValue;
+      observations.usedForStock = data.usedForStock;
+      observations.buildPile    = data.buildPileIndex;
+      observations.timestamp    = Date.now();
+      break;
+
+    case 'opponentBlock':
+      observations.type         = 'opponentBlock';
+      observations.blockedValue = data.blockedValue;
+      observations.kiStockSize  = Game.players.ai.stock.length;
+      observations.timestamp    = Date.now();
+      break;
+
+    case 'opponentDiscard':
+      observations.type              = 'opponentDiscard';
+      observations.cardValue         = data.cardValue;
+      observations.opponentStockSize = Game.players.human.stock.length;
+      observations.kiNextNeeded      = calculateKINextNeeded();
+      observations.timestamp         = Date.now();
+      break;
+
+    case 'kiMove':
+      observations.type           = 'kiMove';
+      observations.sourceType     = data.sourceType;
+      observations.cardValue      = data.cardValue;
+      observations.isJoker        = data.cardType === 'joker';
+      observations.buildPileIndex = data.buildPileIndex;
+      observations.stockSize      = Game.players.ai.stock.length;
+      observations.timestamp      = Date.now();
+      observations.helpedOpponent =
+        Game.players.human.stock.slice(-1)[0]?.value === data.cardValue + 1 ||
+        Game.players.human.discards.some(p => p[p.length - 1]?.value === data.cardValue + 1);
+      // tunerTracking live aktualisieren (v6.5.8, nicht erst beim Spielende)
+      tunerTracking.zugeGesamt++;
+      if (data.sourceType === 'hand')    tunerTracking.handAbgebaut++;
+      if (data.sourceType === 'stock')   tunerTracking.stockZuege++;
+      if (data.sourceType === 'discard') tunerTracking.komboZuege++;
+      if (data.cardType === 'joker' && data.buildPileIndex <= 1) tunerTracking.jokerVerschwendet++;
+      if (data.cardType === 'joker') tunerTracking.jokerGespielt++;
+      if (observations.helpedOpponent)   tunerTracking.gegnerhilfe++;
+      break;
+
+    case 'jokerAdditional':
+      observations.type      = 'jokerAdditional';
+      observations.cardValue = data.cardValue;
+      observations.timestamp = Date.now();
+      break;
+
+    case 'missedStock':
+      observations.type           = 'missedStock';
+      observations.stockCardValue = data.stockCardValue;
+      observations.timestamp      = Date.now();
+      // verpasster Stockzug direkt tracken (v6.5.8)
+      tunerTracking.stockVerpasst++;
+      break;
+
+    case 'gameEnd':
+      observations.type           = 'gameEnd';
+      observations.winner         = data.winner;
+      observations.loserStockSize = data.loserStockSize;
+      observations.timestamp      = Date.now();
+      storedData.games.push(observations);
+      storedData.count++;
+      break;
+
+    default:
+      return null;
+  }
+
+  if (eventType !== 'gameEnd') storedData.games.push(observations);
+  localStorage.setItem('skipbo_observations', JSON.stringify(storedData));
+
+  if (eventType === 'gameEnd') {
+    const currentGame     = storedData.games.filter(g => g.gameId === currentGameId);
+    const currentAnalysis = generateCurrentGameAnalysis(currentGame);
+    const overallAnalysis = generateOverallAnalysis(storedData.games);
+    // tunerTracking für 5-Spiele-Auswertung aktualisieren
+    updateTunerTracking(currentGame);
+
+    if (storedData.count >= maxGames) {
+      localStorage.setItem('skipbo_observations', JSON.stringify({ games: [], count: 0 }));
+    }
+    currentGameId = Date.now();
+    return `${currentAnalysis}\n${overallAnalysis}`;
+  }
+  return null;
+}
+
+/**
+ * calculateKINextNeeded() – Nächste benötigte Baustapelwerte berechnen.
+ * @returns {number[]} Array der nächsten benötigten Werte (je Baustapel)
+ */
+function calculateKINextNeeded() {
+  return Game.buildPiles.map(pile => {
+    if (pile.length === 0) return 1;
+    return pile[pile.length - 1].type === 'joker'
+      ? pile.length + 1
+      : pile[pile.length - 1].value + 1;
+  });
+}
+
+/**
+ * generateCurrentGameAnalysis(currentGame) – Auswertung des aktuellen Spiels.
+ * @param {Array} currentGame – Gefilterte Events des aktuellen Spiels
+ * @returns {string} Formatierter Auswertungstext
+ */
+function generateCurrentGameAnalysis(currentGame) {
+  let a = 'Auswertung des aktuellen Spiels:\n';
+
+  const blocks = currentGame.filter(g =>
+    g.type === 'opponentDiscard' && g.kiNextNeeded?.includes(g.cardValue)
+  ).length;
+  a += `Gegnerblockaden: ${blocks} Mal hat der Gegner eine benötigte Karte gelegt.\n`;
+
+  const jokerUses  = currentGame.filter(g => g.type === 'kiMove' && g.isJoker).length;
+  const earlyJoker = currentGame.filter(g => g.type === 'kiMove' && g.isJoker && g.buildPileIndex < 2).length;
+  a += `Joker-Nutzung: ${jokerUses} Mal, davon ${earlyJoker} auf niedrigen Stapeln (< 2).\n`;
+
+  const stockMoves = currentGame.filter(g => g.type === 'kiMove' && g.sourceType === 'stock').length;
+  a += `Stockabbau: ${stockMoves} Stockkarten erfolgreich gelegt.\n`;
+
+  const missed = currentGame.filter(g => g.type === 'missedStock').length;
+  a += `Verpasste Stockzüge: ${missed} Mal.\n`;
+
+  const helped = currentGame.filter(g => g.type === 'kiMove' && g.helpedOpponent).length;
+  a += `Gegnerhilfe: ${helped} Mal hat die KI dem Gegner geholfen.\n`;
+
+  const gameEnd = currentGame.find(g => g.type === 'gameEnd');
+  if (gameEnd) a += `Ergebnis: ${gameEnd.winner} gewonnen, Verlierer hatte ${gameEnd.loserStockSize} Stockkarten.\n`;
+  return a;
+}
+
+/**
+ * generateOverallAnalysis(games) – Gesamtauswertung mehrerer Spiele.
+ * @param {Array} games – Alle gespeicherten Spielereignisse
+ * @returns {string} Formatierter Auswertungstext
+ */
+function generateOverallAnalysis(games) {
+  let a = 'Gesamtbewertung (bisherige Spiele):\n';
+
+  const blocks = games.filter(g =>
+    g.type === 'opponentDiscard' && g.kiNextNeeded?.includes(g.cardValue)
+  ).length;
+  a += `Gegnerblockaden gesamt: ${blocks}.\n`;
+
+  const jokerUses  = games.filter(g => g.type === 'kiMove' && g.isJoker).length;
+  const earlyJoker = games.filter(g => g.type === 'kiMove' && g.isJoker && g.buildPileIndex < 2).length;
+  a += `Joker gesamt: ${jokerUses}, davon ${earlyJoker} auf niedrigen Stapeln.\n`;
+
+  const stockMoves = games.filter(g => g.type === 'kiMove' && g.sourceType === 'stock').length;
+  a += `Stockzüge gesamt: ${stockMoves}.\n`;
+
+  const missed = games.filter(g => g.type === 'missedStock').length;
+  a += `Verpasste Stockzüge gesamt: ${missed}.\n`;
+
+  const helped = games.filter(g => g.type === 'kiMove' && g.helpedOpponent).length;
+  a += `Gegnerhilfe gesamt: ${helped} Mal.\n`;
+
+  const total = games.filter(g => g.type === 'gameEnd').length;
+  const wins  = games.filter(g => g.type === 'gameEnd' && g.winner === 'KI').length;
+  a += `KI-Siege: ${wins} von ${total} (max. 10 gespeichert).\n`;
+  return a;
+}
+
+/**
+ * updateTunerTracking(currentGame) – Tuner-Tracking nach jedem Spiel aktualisieren.
+ * Aggregiert Statistiken aus dem aktuellen Spiel in tunerTracking.
+ * Nach 5 Spielen wird die Auswertung im Endscreen freigeschaltet.
+ * @param {Array} currentGame – Gefilterte Events des aktuellen Spiels
+ */
+function updateTunerTracking(currentGame) {
+  // Joker gespielt und auf niedrigen Stapeln (potenzielle Verschwendung)
+  const jokerMoves    = currentGame.filter(g => g.type === 'kiMove' && g.isJoker);
+  tunerTracking.jokerGespielt     += jokerMoves.length;
+  // Joker auf niedrigem Baustapel (Index 0 oder 1) = potenzielle Verschwendung
+  tunerTracking.jokerVerschwendet += jokerMoves.filter(g => g.buildPileIndex <= 1).length;
+
+  // Gegnerhilfe: KI hat dem Gegner direkt geholfen
+  tunerTracking.gegnerhilfe += currentGame.filter(g => g.type === 'kiMove' && g.helpedOpponent).length;
+
+  // Stockabbau: erfolgreich gelegt vs. verpasst
+  tunerTracking.stockZuege   += currentGame.filter(g => g.type === 'kiMove' && g.sourceType === 'stock').length;
+  tunerTracking.stockVerpasst += currentGame.filter(g => g.type === 'missedStock').length;
+
+  // Kombinationszüge: Ablage → Baustapel
+  tunerTracking.komboZuege += currentGame.filter(g => g.type === 'kiMove' && g.sourceType === 'discard').length;
+
+  // Handkarten abgebaut
+  tunerTracking.handAbgebaut += currentGame.filter(g => g.type === 'kiMove' && g.sourceType === 'hand').length;
+
+  // Gesamtzüge
+  tunerTracking.zugeGesamt += currentGame.filter(g => g.type === 'kiMove').length;
+
+  // Siege
+  const gameEnd = currentGame.find(g => g.type === 'gameEnd');
+  if (gameEnd && gameEnd.winner === 'KI') tunerTracking.siegerKI++;
+
+  // Spielzähler erhöhen
+  tunerTracking.spiele++;
+
+  // In localStorage sichern
+  saveTunerTracking();
+}
+
+/**
+ * loadTunerTracking() – Tuner-Tracking aus localStorage laden.
+ * Wird beim Spielstart aufgerufen um gespeicherte Daten wiederherzustellen.
+ */
+function loadTunerTracking() {
+  try {
+    const saved = localStorage.getItem('skipbo_tuner_tracking');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Alle Felder übernehmen, fehlende mit 0 initialisieren
+      tunerTracking = {
+        spiele:             parsed.spiele             || 0,
+        jokerGespielt:      parsed.jokerGespielt      || 0,
+        jokerVerschwendet:  parsed.jokerVerschwendet  || 0,
+        gegnerhilfe:        parsed.gegnerhilfe        || 0,
+        stockZuege:         parsed.stockZuege         || 0,
+        stockVerpasst:      parsed.stockVerpasst       || 0,
+        komboZuege:         parsed.komboZuege         || 0,
+        handAbgebaut:       parsed.handAbgebaut       || 0,
+        zugeGesamt:         parsed.zugeGesamt         || 0,
+        siegerKI:           parsed.siegerKI           || 0,
+      };
+    }
+    // Nach 10 Spielen automatisch zurücksetzen
+    if (tunerTracking.spiele >= 10) resetTunerTracking();
+  } catch(e) {
+    console.warn('Tuner-Tracking konnte nicht geladen werden:', e);
+  }
+}
+
+/**
+ * saveTunerTracking() – Tuner-Tracking in localStorage speichern.
+ */
+function saveTunerTracking() {
+  try {
+    localStorage.setItem('skipbo_tuner_tracking', JSON.stringify(tunerTracking));
+  } catch(e) {
+    console.warn('Tuner-Tracking konnte nicht gespeichert werden:', e);
+  }
+}
+
+/**
+ * resetTunerTracking() – Tuner-Tracking zurücksetzen.
+ * Wird über das ⚙️-Menü aufgerufen oder nach 10 Spielen automatisch.
+ */
+function resetTunerTracking() {
+  tunerTracking = {
+    spiele:             0,
+    jokerGespielt:      0,
+    jokerVerschwendet:  0,
+    gegnerhilfe:        0,
+    stockZuege:         0,
+    stockVerpasst:      0,
+    komboZuege:         0,
+    handAbgebaut:       0,
+    zugeGesamt:         0,
+    siegerKI:           0,
+  };
+  saveTunerTracking();
+  showMessage('📊 Auswertung zurückgesetzt – 5 neue Spiele werden gesammelt');
+}
+
+/**
+ * generateTunerAnalysis() – 5-Spiele-Tuner-Auswertung generieren.
+ * Gibt eine HTML-Zeichenkette mit Bewertungen und Slider-Empfehlungen zurück.
+ * Wird nur angezeigt wenn mindestens 5 Spiele gespielt wurden.
+ * @returns {string} HTML-Inhalt für die Auswertung
+ */
+function generateTunerAnalysis() {
+  // 🌐 v6.6.0: Alle Texte kommen aus dem Sprachmodul (TA-Keys), die
+  // Schwellen/Formeln sind 1:1 die getunten Werte aus v6.5.9.
+  if (tunerTracking.spiele < 5) {
+    return `<p style="color:#aaa; text-align:center;">
+      ${t('taNeedMore', 5 - tunerTracking.spiele)}<br>
+      ${t('taTotal')}: ${tunerTracking.spiele}/5
+    </p>`;
+  }
+
+  const gesamt = tunerTracking.zugeGesamt || 1;
+
+  // ── JOKER ──
+  const jokerRate = tunerTracking.jokerGespielt / tunerTracking.spiele;
+  const jokerWasteRate = tunerTracking.jokerGespielt > 0
+    ? tunerTracking.jokerVerschwendet / tunerTracking.jokerGespielt : 0;
+  let jokerStatus, jokerEmoji, jokerHinweis;
+  if (jokerWasteRate > 0.4)      { jokerStatus='🔴'; jokerEmoji=t('taJokerBad');  jokerHinweis=t('taJokerBadTip'); }
+  else if (jokerRate < 1)        { jokerStatus='🟡'; jokerEmoji=t('taJokerFew');  jokerHinweis=t('taJokerFewTip'); }
+  else                           { jokerStatus='🟢'; jokerEmoji=t('taJokerOk');   jokerHinweis=t('taJokerOkTip'); }
+
+  // ── GEGNERHILFE ──
+  const hilfeRate = tunerTracking.gegnerhilfe / tunerTracking.spiele;
+  let hilfeStatus, hilfeEmoji, hilfeHinweis;
+  if (hilfeRate > 3)        { hilfeStatus='🔴'; hilfeEmoji=t('taHelpBad');  hilfeHinweis=t('taHelpBadTip'); }
+  else if (hilfeRate > 1.5) { hilfeStatus='🟡'; hilfeEmoji=t('taHelpSome'); hilfeHinweis=t('taHelpSomeTip'); }
+  else                      { hilfeStatus='🟢'; hilfeEmoji=t('taHelpOk');   hilfeHinweis=t('taHelpOkTip'); }
+
+  // ── STOCKABBAU ──
+  const stockVerpasstRate = tunerTracking.stockZuege > 0
+    ? tunerTracking.stockVerpasst / (tunerTracking.stockZuege + tunerTracking.stockVerpasst) : 0;
+  let stockStatus, stockEmoji, stockHinweis;
+  if (stockVerpasstRate > 0.3)       { stockStatus='🔴'; stockEmoji=t('taStockBad');  stockHinweis=t('taStockBadTip'); }
+  else if (stockVerpasstRate > 0.15) { stockStatus='🟡'; stockEmoji=t('taStockSome'); stockHinweis=t('taStockSomeTip'); }
+  else                               { stockStatus='🟢'; stockEmoji=t('taStockOk');   stockHinweis=t('taStockOkTip'); }
+
+  // ── KOMBINATIONEN ──
+  const komboRate = tunerTracking.komboZuege / tunerTracking.spiele;
+  let komboStatus, komboEmoji, komboHinweis;
+  if (komboRate < 1)      { komboStatus='🟡'; komboEmoji=t('taComboFew');  komboHinweis=t('taComboFewTip'); }
+  else if (komboRate > 5) { komboStatus='🟡'; komboEmoji=t('taComboMany'); komboHinweis=t('taComboManyTip'); }
+  else                    { komboStatus='🟢'; komboEmoji=t('taComboOk');   komboHinweis=t('taComboOkTip'); }
+
+  // ── HANDKARTEN ──
+  const handProZug = tunerTracking.handAbgebaut / tunerTracking.spiele;
+  let handStatus, handEmoji, handHinweis;
+  if (handProZug < 8) { handStatus='🟡'; handEmoji=t('taHandFew'); handHinweis=t('taHandFewTip'); }
+  else                { handStatus='🟢'; handEmoji=t('taHandOk');  handHinweis=t('taHandOkTip'); }
+
+  const winRate = Math.round((tunerTracking.siegerKI / tunerTracking.spiele) * 100);
+
+  const box = (status, icon, titleKey, line1, hinweis) => `
+      <div style="margin-bottom:10px; padding:8px; background:rgba(255,255,255,0.05); border-radius:6px;">
+        <b>${status} ${icon} ${t(titleKey)}:</b> ${line1.head}<br>
+        ${line1.body}<br>
+        <span style="color:#00d4ff;">${hinweis}</span>
+      </div>`;
+
+  return `
+    <div style="font-size:0.85em; line-height:1.6;">
+      <p style="text-align:center; color:#ffd700; font-weight:bold; margin-bottom:12px;">
+        ${t('taHeader', tunerTracking.spiele, winRate)}
+      </p>
+      ${box(jokerStatus,'🃏','taJokerTitle',{head:jokerEmoji, body:`${t('taPlayed')}: ${tunerTracking.jokerGespielt}× · ${t('taWasted')}: ${tunerTracking.jokerVerschwendet}×`}, jokerHinweis)}
+      ${box(hilfeStatus,'🛡️','taHelpTitle',{head:hilfeEmoji, body:`${t('taOverall')}: ${tunerTracking.gegnerhilfe}× (Ø ${hilfeRate.toFixed(1)}/${t('taPerGame')})`}, hilfeHinweis)}
+      ${box(stockStatus,'🗃️','taStockTitle',{head:stockEmoji, body:`${t('taLaid')}: ${tunerTracking.stockZuege}× · ${t('taMissed')}: ${tunerTracking.stockVerpasst}×`}, stockHinweis)}
+      ${box(komboStatus,'🔗','taComboTitle',{head:komboEmoji, body:`${t('taDiscToBuild')}: ${tunerTracking.komboZuege}× (Ø ${komboRate.toFixed(1)}/${t('taPerGame')})`}, komboHinweis)}
+      ${box(handStatus,'✋','taHandTitle',{head:handEmoji, body:`${t('taHandToBuild')}: ${tunerTracking.handAbgebaut}× (Ø ${handProZug.toFixed(1)}/${t('taPerGame')})`}, handHinweis)}
+      <p style="color:#8b9bb4; font-size:0.85em; margin-top:10px; text-align:center;">
+        ${t('taFooter')}
+      </p>
+    </div>`;
+}
+
+// ================================================================
+// MODUL 16 – INFO-FENSTER, SCHNELLMENÜ & INITIALISIERUNG
+// ================================================================
+
+/**
+ * pressTimer – Globale Variable für Long-Press Timer.
+ * Wird von handleLongPress() und handleRelease() genutzt.
+ * Muss global sein damit handleRelease() ihn löschen kann.
+ */
+let pressTimer;
+
+/**
+ * showInfoWindow(event, discardPileIndex, player) – Ablagestapel-Inhalt anzeigen.
+ * Zeigt alle Karten des Stapels von oben nach unten.
+ * Blendet sich nach 5 Sekunden automatisch aus.
+ * @param {Event} event – Touch- oder Maus-Event
+ * @param {number} discardPileIndex – Index des Ablagestapels (0-3)
+ * @param {string} player – 'human' oder 'ai'
+ */
+function showInfoWindow(event, discardPileIndex, player) {
+  const infoWindow = document.getElementById('info-window');
+  const infoTable  = document.getElementById('info-table');
+  if (!infoWindow || !infoTable) return;
+
+  infoTable.innerHTML = '';
+  const cards = Game.players[player].discards[discardPileIndex];
+
+  if (cards && cards.length > 0) {
+    // Karten von oben nach unten anzeigen
+    [...cards].reverse().forEach(card => {
+      const row  = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.textContent = card.type === 'joker' ? '★ ' + t('joker') : card.value;
+      row.appendChild(cell);
+      infoTable.appendChild(row);
+    });
+
+    const rect = event.target.getBoundingClientRect();
+    infoWindow.style.left    = `${rect.left + window.scrollX}px`;
+    infoWindow.style.top     = `${rect.top + window.scrollY - infoWindow.offsetHeight - 10}px`;
+    infoWindow.style.display = 'block';
+    setTimeout(() => { infoWindow.style.display = 'none'; }, 5000);
+  }
+}
+
+/**
+ * handleLongPress(event, discardPileIndex, player) – Long-Press Timer starten.
+ * Nach 1 Sekunde Drücken: Info-Fenster öffnen.
+ */
+function handleLongPress(event, discardPileIndex, player) {
+  pressTimer = setTimeout(() => { showInfoWindow(event, discardPileIndex, player); }, 1000);
+}
+
+/**
+ * handleRelease() – Long-Press Timer stoppen.
+ */
+function handleRelease() { clearTimeout(pressTimer); }
+
+/**
+ * toggleQuickMenu(event) – Schnellmenü ein-/ausblenden.
+ */
+function toggleQuickMenu(event) {
+  event.stopPropagation(); // Verhindert dass Klick das Label verschiebt
+  const menu = document.getElementById('quick-menu');
+  if (!menu) return;
+  const isVisible = menu.style.display !== 'none';
+  menu.style.display = isVisible ? 'none' : 'block';
+}
+
+/**
+ * closeQuickMenu() – Schnellmenü schließen.
+ */
+function closeQuickMenu() {
+  const menu = document.getElementById('quick-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+/**
+ * menuEinstellungen() – Einstellungen-Overlay öffnen.
+ */
+function menuEinstellungen() {
+  closeQuickMenu();
+  showOverlay();
+}
+
+/**
+ * menuSpielregeln() – Spielregeln in Overlay anzeigen.
+ */
+function menuSpielregeln() {
+  closeQuickMenu();
+  showOverlay(); // Overlay zeigt bereits Spielregeln im #overlay-info Bereich
+}
+
+/**
+ * menuNeuesSpiel() – Neues Spiel starten (mit Bestätigung).
+ */
+function menuNeuesSpiel() {
+  closeQuickMenu();
+  if (confirm(t('confirmNewGame'))) {
+    location.reload();
+  }
+}
+
+/**
+ * menuTunerReset() – Tuner-Tracking zurücksetzen.
+ */
+function menuTunerReset() {
+  closeQuickMenu();
+  if (confirm(t('confirmTunerReset', tunerTracking.spiele))) {
+    resetTunerTracking();
+  }
+}
+
+/**
+ * menuImpressum() – Impressum in neuem Tab oeffnen.
+ * Liegt als eigene Seite im selben Skipo-Ordner; oeffnet sich separat,
+ * damit der Spielstand erhalten bleibt.
+ */
+function menuImpressum() {
+  closeQuickMenu();
+  window.open('https://dietertepe.github.io/Skipo/impressum.html', '_blank');
+}
+
+/**
+ * menuDatenschutz() – Datenschutzerklaerung in neuem Tab oeffnen.
+ */
+function menuDatenschutz() {
+  closeQuickMenu();
+  window.open('https://dietertepe.github.io/Skipo/datenschutz.html', '_blank');
+}
+
+// Schnellmenü schließen wenn irgendwo anders getippt wird
+document.addEventListener('click', e => {
+  const menu    = document.getElementById('quick-menu');
+  const menuBtn = document.getElementById('menu-btn');
+  if (menu && menuBtn && !menu.contains(e.target) && e.target !== menuBtn) {
+    menu.style.display = 'none';
+  }
+});
+document.addEventListener('touchstart', e => {
+  const menu    = document.getElementById('quick-menu');
+  const menuBtn = document.getElementById('menu-btn');
+  if (menu && menuBtn && !menu.contains(e.target) && e.target !== menuBtn) {
+    menu.style.display = 'none';
+  }
+});
+
+// ----------------------------------------------------------------
+// INITIALISIERUNG & EVENT-LISTENER
+// ----------------------------------------------------------------
+
+// DOMContentLoaded: Spiel starten sobald HTML fertig geladen
+document.addEventListener('DOMContentLoaded', () => {
+  initGame();
+  setupTouchEvents();
+});
+
+// Long-Press auf Spieler-Ablagestapel: Info-Fenster anzeigen
+document.querySelectorAll('.human-area .discard-field').forEach(target => {
+  target.addEventListener('touchstart', event => {
+    const idx = Array.from(target.parentElement.children).indexOf(target);
+    handleLongPress(event, idx, 'human');
+  });
+  target.addEventListener('touchend',  handleRelease);
+  target.addEventListener('mousedown', event => {
+    const idx = Array.from(target.parentElement.children).indexOf(target);
+    handleLongPress(event, idx, 'human');
+  });
+  target.addEventListener('mouseup', handleRelease);
+});
+
+// Long-Press auf KI-Ablagestapel: Info-Fenster anzeigen
+// idx -= 1 weil das erste Kind der main-piles der Stock-Stapel ist
+document.querySelectorAll('.opponent-area .discard-field').forEach(target => {
+  target.addEventListener('touchstart', event => {
+    let idx = Array.from(target.parentElement.children).indexOf(target);
+    idx -= 1;
+    handleLongPress(event, idx, 'ai');
+  });
+  target.addEventListener('touchend',  handleRelease);
+  target.addEventListener('mousedown', event => {
+    let idx = Array.from(target.parentElement.children).indexOf(target);
+    idx -= 1;
+    handleLongPress(event, idx, 'ai');
+  });
+  target.addEventListener('mouseup', handleRelease);
+});
+
+// Layout-Anpassung bei Rotation/Resize (Platzhalter – 9:16-Container übernimmt das)
+function adjustLayoutForPortrait() { /* Modernes 9:16-Layout benötigt kein manuelles Resize */ }
+window.addEventListener('resize',            adjustLayoutForPortrait);
+window.addEventListener('orientationchange', adjustLayoutForPortrait);
+
+// ================================================================
+// MODUL 17 – 🌐 SPRACHMODUL (NEU 11.6.2026)
+// ================================================================
+// Vier Sprachen: Deutsch (Quellsprache), English, Português, Українська.
+// Architektur:
+//   • Die SPIELLOGIK bleibt vollständig deutsch (alle showMessage-
+//     Aufrufe unverändert) → null Risiko für Engine & Tuner-Workflow.
+//   • showMessage() schickt jede Meldung durch translateMessage():
+//     Muster-Regeln erkennen die deutsche Vorlage und setzen Zahlen,
+//     Namen und Phrasen in die Zielsprache um. Unbekannte Texte
+//     laufen unverändert durch (failsafe).
+//   • Statische Texte (Menü, Overlay, Regeln, Endscreen, Tuner-
+//     Auswertung, Feldbeschriftungen) kommen aus dem Wörterbuch T
+//     über t(key, …werte).
+//   • refreshFieldLabels() setzt die Stapel-Beschriftungen sprachecht
+//     UND mit Live-Zählern (Fix: standen vorher eingefroren im HTML).
+// ================================================================
+
+let LANG = (function () {
+  try { return localStorage.getItem('skipbo-lang') || 'de'; }
+  catch (e) { return 'de'; }
+})();
+if (!['de', 'en', 'pt', 'uk'].includes(LANG)) LANG = 'de';
+
+/**
+ * t(key, ...args) – Text aus dem Wörterbuch in der aktiven Sprache.
+ * Platzhalter {0}, {1}, … werden durch die Argumente ersetzt.
+ */
+function t(key, ...args) {
+  const entry = T[key];
+  let s = entry ? (entry[LANG] ?? entry.de) : key;
+  return s.replace(/\{(\d)\}/g, (_, i) => args[i] !== undefined ? args[i] : '');
+}
+
+// ----------------------------------------------------------------
+// WÖRTERBUCH – statische Texte
+// ----------------------------------------------------------------
+const T = {
+  // Allgemein
+  joker:        { de:'Joker', en:'Joker', pt:'Coringa', uk:'Джокер' },
+  langName:     { de:'Deutsch', en:'English', pt:'Português', uk:'Українська' },
+  langSet:      { de:'🌐 Sprache: Deutsch', en:'🌐 Language: English',
+                  pt:'🌐 Idioma: Português', uk:'🌐 Мова: Українська' },
+  langTitle:    { de:'🌐 Sprache wählen', en:'🌐 Choose language',
+                  pt:'🌐 Escolher idioma', uk:'🌐 Виберіть мову' },
+
+  // Quick-Menü
+  qmSettings:   { de:'⚙️ Einstellungen', en:'⚙️ Settings', pt:'⚙️ Definições', uk:'⚙️ Налаштування' },
+  qmRules:      { de:'📖 Spielregeln', en:'📖 Game rules', pt:'📖 Regras do jogo', uk:'📖 Правила гри' },
+  qmLang:       { de:'🌐 Sprache / Language', en:'🌐 Language', pt:'🌐 Idioma', uk:'🌐 Мова' },
+  qmNewGame:    { de:'🔄 Neues Spiel', en:'🔄 New game', pt:'🔄 Novo jogo', uk:'🔄 Нова гра' },
+  qmTuner:      { de:'📊 Auswertung zurücksetzen', en:'📊 Reset evaluation',
+                  pt:'📊 Repor avaliação', uk:'📊 Скинути аналіз' },
+  qmClose:      { de:'✕ Schließen', en:'✕ Close', pt:'✕ Fechar', uk:'✕ Закрити' },
+  qmImprint:    { de:'📄 Impressum', en:'📄 Legal notice', pt:'📄 Aviso legal', uk:'📄 Юридична інформація' },
+  qmPrivacy:    { de:'🔒 Datenschutz', en:'🔒 Privacy', pt:'🔒 Privacidade', uk:'🔒 Конфіденційність' },
+  qmDesign:     { de:'🎨 Design', en:'🎨 Design', pt:'🎨 Design', uk:'🎨 Дизайн' },
+  designTitle:  { de:'Hintergrund-Design', en:'Background design', pt:'Design de fundo', uk:'Дизайн фону' },
+  designThemes: { de:'Themen', en:'Themes', pt:'Temas', uk:'Теми' },
+  designFine:   { de:'Feinjustierung', en:'Fine-tuning', pt:'Ajuste fino', uk:'Точне налаштування' },
+  designBright: { de:'Helligkeit', en:'Brightness', pt:'Brilho', uk:'Яскравість' },
+  designHue:    { de:'Farbton', en:'Hue', pt:'Matiz', uk:'Відтінок' },
+  designDone:   { de:'Fertig', en:'Done', pt:'Concluído', uk:'Готово' },
+
+  // Einstellungs-Overlay
+  btnApply:     { de:'Übernehmen', en:'Apply', pt:'Aplicar', uk:'Застосувати' },
+  btnClose:     { de:'Schließen', en:'Close', pt:'Fechar', uk:'Закрити' },
+  phName:       { de:'Spielername', en:'Player name', pt:'Nome do jogador', uk:"Ім'я гравця" },
+  speedLabel:   { de:'Geschwindigkeit (0–20s)', en:'Speed (0–20s)',
+                  pt:'Velocidade (0–20s)', uk:'Швидкість (0–20с)' },
+
+  // Bestätigungen
+  confirmNewGame:    { de:'Neues Spiel starten? Das aktuelle Spiel wird beendet.',
+                       en:'Start a new game? The current game will end.',
+                       pt:'Iniciar um novo jogo? O jogo atual será terminado.',
+                       uk:'Почати нову гру? Поточну гру буде завершено.' },
+  confirmTunerReset: { de:'Tuner-Auswertung zurücksetzen? Die gesammelten Daten von {0} Spielen werden gelöscht.',
+                       en:'Reset tuner evaluation? Collected data from {0} games will be deleted.',
+                       pt:'Repor a avaliação do tuner? Os dados de {0} jogos serão apagados.',
+                       uk:'Скинути аналіз тюнера? Зібрані дані {0} ігор буде видалено.' },
+
+  // Endscreen
+  endTitle:     { de:'🏁 Spiel beendet!', en:'🏁 Game over!', pt:'🏁 Fim do jogo!', uk:'🏁 Гру завершено!' },
+  winner:       { de:'Gewinner', en:'Winner', pt:'Vencedor', uk:'Переможець' },
+  loser:        { de:'Verlierer', en:'Loser', pt:'Perdedor', uk:'Переможений' },
+  withPoints:   { de:'mit <strong>{0} Punkten</strong>', en:'with <strong>{0} points</strong>',
+                  pt:'com <strong>{0} pontos</strong>', uk:'з <strong>{0} очками</strong>' },
+  btnNewGame:   { de:'🔄 Neues Spiel', en:'🔄 New game', pt:'🔄 Novo jogo', uk:'🔄 Нова гра' },
+  btnTunerReady:{ de:'📊 Tuner-Auswertung ({0} Spiele)', en:'📊 Tuner evaluation ({0} games)',
+                  pt:'📊 Avaliação do tuner ({0} jogos)', uk:'📊 Аналіз тюнера ({0} ігор)' },
+  btnTunerWait: { de:'📊 Noch {0} Spiele bis Auswertung', en:'📊 {0} more games until evaluation',
+                  pt:'📊 Faltam {0} jogos para a avaliação', uk:'📊 Ще {0} ігор до аналізу' },
+
+  // Tuner-Auswertung
+  taHeader:     { de:'📊 Auswertung: {0} Spiele · KI-Siegrate: {1}%',
+                  en:'📊 Evaluation: {0} games · AI win rate: {1}%',
+                  pt:'📊 Avaliação: {0} jogos · Taxa de vitória da IA: {1}%',
+                  uk:'📊 Аналіз: {0} ігор · Перемоги ШІ: {1}%' },
+  taNeedMore:   { de:'Noch {0} Spiele bis zur Auswertung.', en:'{0} more games until evaluation.',
+                  pt:'Faltam {0} jogos para a avaliação.', uk:'Ще {0} ігор до аналізу.' },
+  taTotal:      { de:'Spiele insgesamt', en:'Total games', pt:'Total de jogos', uk:'Усього ігор' },
+  taPerGame:    { de:'Spiel', en:'game', pt:'jogo', uk:'гру' },
+  taPlayed:     { de:'Gespielt', en:'Played', pt:'Jogados', uk:'Зіграно' },
+  taWasted:     { de:'Davon verschwendet', en:'Of which wasted', pt:'Dos quais desperdiçados', uk:'З них змарновано' },
+  taOverall:    { de:'Insgesamt', en:'Total', pt:'Total', uk:'Усього' },
+  taLaid:       { de:'Gelegt', en:'Played', pt:'Colocadas', uk:'Зіграно' },
+  taMissed:     { de:'Verpasst', en:'Missed', pt:'Falhadas', uk:'Пропущено' },
+  taDiscToBuild:{ de:'Ablage→Bau gesamt', en:'Discard→Build total', pt:'Descarte→Construção total', uk:'Скид→Будова всього' },
+  taHandToBuild:{ de:'Hand→Bau gesamt', en:'Hand→Build total', pt:'Mão→Construção total', uk:'Рука→Будова всього' },
+  taFooter:     { de:'Nach dem Einstellen der Tuner-Slider: Auswertung zurücksetzen<br>(⚙️-Menü → Auswertung zurücksetzen)',
+                  en:'After adjusting the tuner sliders: reset the evaluation<br>(⚙️ menu → Reset evaluation)',
+                  pt:'Depois de ajustar os controlos do tuner: repor a avaliação<br>(menu ⚙️ → Repor avaliação)',
+                  uk:'Після налаштування повзунків тюнера: скиньте аналіз<br>(меню ⚙️ → Скинути аналіз)' },
+  taJokerTitle: { de:'Joker', en:'Jokers', pt:'Coringas', uk:'Джокери' },
+  taJokerBad:   { de:'Joker oft verschwendet', en:'Jokers often wasted', pt:'Coringas muitas vezes desperdiçados', uk:'Джокери часто марнуються' },
+  taJokerBadTip:{ de:'→ Tuner: <b>Joker-Slider senken</b> (KI ist zu aggressiv beim Joker-Einsatz)',
+                  en:'→ Tuner: <b>lower the joker slider</b> (AI plays jokers too aggressively)',
+                  pt:'→ Tuner: <b>baixar o controlo de coringas</b> (a IA usa coringas de forma demasiado agressiva)',
+                  uk:'→ Тюнер: <b>зменшіть повзунок джокерів</b> (ШІ грає джокерами надто агресивно)' },
+  taJokerFew:   { de:'Joker selten gespielt', en:'Jokers rarely played', pt:'Coringas raramente jogados', uk:'Джокери грають рідко' },
+  taJokerFewTip:{ de:'→ Tuner: <b>Joker-Slider leicht erhöhen</b> (KI nutzt Joker zu selten)',
+                  en:'→ Tuner: <b>raise the joker slider slightly</b> (AI uses jokers too rarely)',
+                  pt:'→ Tuner: <b>aumentar ligeiramente o controlo de coringas</b> (a IA usa coringas raramente)',
+                  uk:'→ Тюнер: <b>трохи підвищіть повзунок джокерів</b> (ШІ рідко використовує джокери)' },
+  taJokerOk:    { de:'Joker-Einsatz gut', en:'Joker use is good', pt:'Bom uso de coringas', uk:'Використання джокерів добре' },
+  taJokerOkTip: { de:'→ Tuner: <b>Joker-Slider passt</b> (kein Anpassungsbedarf)',
+                  en:'→ Tuner: <b>joker slider is fine</b> (no change needed)',
+                  pt:'→ Tuner: <b>controlo de coringas adequado</b> (sem necessidade de ajuste)',
+                  uk:'→ Тюнер: <b>повзунок джокерів у нормі</b> (змін не потрібно)' },
+  taHelpTitle:  { de:'Gegnerhilfe', en:'Helping opponent', pt:'Ajuda ao adversário', uk:'Допомога супернику' },
+  taHelpBad:    { de:'KI hilft Gegner oft', en:'AI often helps the opponent', pt:'A IA ajuda o adversário com frequência', uk:'ШІ часто допомагає супернику' },
+  taHelpBadTip: { de:'→ Tuner: <b>Defensiv-Slider erhöhen</b> (mehr Blockade-Vorsicht)',
+                  en:'→ Tuner: <b>raise the defensive slider</b> (more blocking caution)',
+                  pt:'→ Tuner: <b>aumentar o controlo defensivo</b> (mais cuidado com bloqueios)',
+                  uk:'→ Тюнер: <b>підвищіть захисний повзунок</b> (більше обережності з блокуванням)' },
+  taHelpSome:   { de:'KI hilft Gegner manchmal', en:'AI sometimes helps the opponent', pt:'A IA ajuda o adversário às vezes', uk:'ШІ інколи допомагає супернику' },
+  taHelpSomeTip:{ de:'→ Tuner: <b>Defensiv-Slider leicht erhöhen</b>',
+                  en:'→ Tuner: <b>raise the defensive slider slightly</b>',
+                  pt:'→ Tuner: <b>aumentar ligeiramente o controlo defensivo</b>',
+                  uk:'→ Тюнер: <b>трохи підвищіть захисний повзунок</b>' },
+  taHelpOk:     { de:'Gegnerhilfe gering', en:'Little help to opponent', pt:'Pouca ajuda ao adversário', uk:'Допомога супернику незначна' },
+  taHelpOkTip:  { de:'→ Tuner: <b>Defensiv-Slider passt</b>', en:'→ Tuner: <b>defensive slider is fine</b>',
+                  pt:'→ Tuner: <b>controlo defensivo adequado</b>', uk:'→ Тюнер: <b>захисний повзунок у нормі</b>' },
+  taStockTitle: { de:'Stockabbau', en:'Stock reduction', pt:'Redução da reserva', uk:'Розбір запасу' },
+  taStockBad:   { de:'Viele verpasste Stockzüge', en:'Many missed stock plays', pt:'Muitas jogadas de reserva falhadas', uk:'Багато пропущених ходів запасу' },
+  taStockBadTip:{ de:'→ Tuner: <b>Stockabbau-Slider erhöhen</b> (KI priorisiert Stock zu wenig)',
+                  en:'→ Tuner: <b>raise the stock slider</b> (AI prioritizes the stock too little)',
+                  pt:'→ Tuner: <b>aumentar o controlo de reserva</b> (a IA dá pouca prioridade à reserva)',
+                  uk:'→ Тюнер: <b>підвищіть повзунок запасу</b> (ШІ замало пріоритезує запас)' },
+  taStockSome:  { de:'Einige verpasste Stockzüge', en:'Some missed stock plays', pt:'Algumas jogadas de reserva falhadas', uk:'Деякі ходи запасу пропущено' },
+  taStockSomeTip:{ de:'→ Tuner: <b>Stockabbau-Slider leicht erhöhen</b>',
+                   en:'→ Tuner: <b>raise the stock slider slightly</b>',
+                   pt:'→ Tuner: <b>aumentar ligeiramente o controlo de reserva</b>',
+                   uk:'→ Тюнер: <b>трохи підвищіть повзунок запасу</b>' },
+  taStockOk:    { de:'Stockabbau effizient', en:'Stock reduction efficient', pt:'Redução da reserva eficiente', uk:'Розбір запасу ефективний' },
+  taStockOkTip: { de:'→ Tuner: <b>Stockabbau-Slider passt</b>', en:'→ Tuner: <b>stock slider is fine</b>',
+                  pt:'→ Tuner: <b>controlo de reserva adequado</b>', uk:'→ Тюнер: <b>повзунок запасу в нормі</b>' },
+  taComboTitle: { de:'Kombinationszüge', en:'Combo moves', pt:'Jogadas combinadas', uk:'Комбіновані ходи' },
+  taComboFew:   { de:'Wenige Kombinations-Züge', en:'Few combo moves', pt:'Poucas jogadas combinadas', uk:'Мало комбінованих ходів' },
+  taComboFewTip:{ de:'→ Tuner: <b>Kombinations-Slider erhöhen</b> (Ablagestapel besser nutzen)',
+                  en:'→ Tuner: <b>raise the combo slider</b> (use discard piles better)',
+                  pt:'→ Tuner: <b>aumentar o controlo de combinações</b> (aproveitar melhor as pilhas de descarte)',
+                  uk:'→ Тюнер: <b>підвищіть повзунок комбінацій</b> (краще використовуйте стоси скидання)' },
+  taComboMany:  { de:'Sehr viele Kombinations-Züge', en:'Very many combo moves', pt:'Muitíssimas jogadas combinadas', uk:'Дуже багато комбінованих ходів' },
+  taComboManyTip:{ de:'→ Tuner: <b>Kombinations-Slider etwas senken</b> (Balance prüfen)',
+                   en:'→ Tuner: <b>lower the combo slider a little</b> (check balance)',
+                   pt:'→ Tuner: <b>baixar um pouco o controlo de combinações</b> (verificar o equilíbrio)',
+                   uk:'→ Тюнер: <b>трохи зменшіть повзунок комбінацій</b> (перевірте баланс)' },
+  taComboOk:    { de:'Kombinationen ausgewogen', en:'Combos balanced', pt:'Combinações equilibradas', uk:'Комбінації збалансовані' },
+  taComboOkTip: { de:'→ Tuner: <b>Kombinations-Slider passt</b>', en:'→ Tuner: <b>combo slider is fine</b>',
+                  pt:'→ Tuner: <b>controlo de combinações adequado</b>', uk:'→ Тюнер: <b>повзунок комбінацій у нормі</b>' },
+  taHandTitle:  { de:'Handkarten', en:'Hand cards', pt:'Cartas da mão', uk:'Карти руки' },
+  taHandFew:    { de:'Handkarten wenig genutzt', en:'Hand cards little used', pt:'Cartas da mão pouco usadas', uk:'Карти руки використовуються мало' },
+  taHandFewTip: { de:'→ Tuner: <b>Handkarten-Slider erhöhen</b> (mehr Handkarten auf Baustapel legen)',
+                  en:'→ Tuner: <b>raise the hand slider</b> (play more hand cards to build piles)',
+                  pt:'→ Tuner: <b>aumentar o controlo da mão</b> (jogar mais cartas da mão nas construções)',
+                  uk:'→ Тюнер: <b>підвищіть повзунок руки</b> (грайте більше карт руки на будови)' },
+  taHandOk:     { de:'Handkarten gut genutzt', en:'Hand cards well used', pt:'Cartas da mão bem usadas', uk:'Карти руки використовуються добре' },
+  taHandOkTip:  { de:'→ Tuner: <b>Handkarten-Slider passt</b>', en:'→ Tuner: <b>hand slider is fine</b>',
+                  pt:'→ Tuner: <b>controlo da mão adequado</b>', uk:'→ Тюнер: <b>повзунок руки в нормі</b>' },
+
+  // Feldbeschriftungen (Live-Zähler!)
+  lblStockOpp:  { de:'🗃️ Gegner Stock ({0})', en:'🗃️ Opponent stock ({0})',
+                  pt:'🗃️ Reserva do adversário ({0})', uk:'🗃️ Запас суперника ({0})' },
+  lblStockSelf: { de:' Spieler Stock ({0})', en:' Your stock ({0})',
+                  pt:' A tua reserva ({0})', uk:' Твій запас ({0})' },
+  lblAblage:    { de:'🗑️ Ablage {0}', en:'🗑️ Discard {0}', pt:'🗑️ Descarte {0}', uk:'🗑️ Скид {0}' },
+  lblBau:       { de:'▲ Bau {0} ({1})', en:'▲ Build {0} ({1})', pt:'▲ Construção {0} ({1})', uk:'▲ Будова {0} ({1})' },
+  lblNachzieh:  { de:'🃏 Nachziehstapel ({0})', en:'🃏 Draw pile ({0})',
+                  pt:'🃏 Pilha de compra ({0})', uk:'🃏 Колода ({0})' },
+
+  // Spielregeln (Overlay) – vollständige Texte je Sprache
+  rulesHtml: {
+de: `
+    <h2>Spielregeln und Benutzerinformationen</h2>
+
+    <p><strong>1. Ziel des Spiels:</strong><br>
+    - Das Hauptziel ist es, alle Karten aus deinem Stockstapel abzulegen, um das Spiel zu gewinnen.<br>
+    - Du kannst Karten auf die Baukartenstapel in aufsteigender Reihenfolge von 1 bis 12 ablegen.<br>
+    - Joker können jede Karte ersetzen und haben keinen festen Wert.</p>
+
+    <p><strong>2. Kartentypen:</strong><br>
+    - Zahlenkarten: Karten mit Werten von 1 bis 12.<br>
+    - Joker (★): Kann jede Karte ersetzen und wird flexibel verwendet.</p>
+
+    <p><strong>3. Kartenmengen:</strong><br>
+    - 144 Zahlenkarten (12 Sätze × 12 Karten) + 12 Joker = 156 Karten gesamt.</p>
+
+    <p><strong>4. Spielstart:</strong><br>
+    - Jeder Spieler erhält 5 Handkarten und 20 Stockkarten.<br>
+    - Die restlichen Karten bilden den Nachziehstapel.</p>
+
+    <p><strong>5. Spielverlauf:</strong><br>
+    - Spieler legen abwechselnd Karten auf Baustapel oder Ablagestapel.<br>
+    - Baustapel: aufsteigende Reihenfolge 1–12. Joker ersetzt jeden Wert.<br>
+    - Vollständiger Baustapel (1–12) wird geleert und gemischt.<br>
+    - Nachziehen bis 5 Handkarten vorhanden.<br>
+    - Kein legaler Zug möglich → Karte auf Ablagestapel legen (Pflichtzug).<br>
+    - Kurzes Drücken auf Ablagestapel: Karteninhalt anzeigen.</p>
+
+    <p><strong>6. Spieleraktionen:</strong><br>
+    - Karte antippen = Karte auswählen (leuchtet auf).<br>
+    - Nochmals antippen = Auswahl aufheben.<br>
+    - Zielstapel antippen = Karte dorthin legen.<br>
+    - Infoleiste verschieben für optimale Sicht.</p>
+
+    <p><strong>7. Spielgeschwindigkeit:</strong><br>
+    - Schieberegler: 0s (sehr schnell) bis 20s (sehr langsam).<br>
+    - Standard: 4s. Für KI-Analyse empfehlen sich 6–10s.</p>
+
+    <p><strong>8. Spielende:</strong><br>
+    - Wer zuerst seinen Stock leer hat, gewinnt.<br>
+    - Verlierer erhält 5 Punkte pro verbleibender Stockkarte.</p>
+
+    <p><strong>9. Hinweise:</strong><br>
+    - 5 Sekunden drücken: Dieses Info-Fenster erneut öffnen.<br>
+    - Infoleiste nach unten schieben für mehr Platz.</p>
+  `,
+en: `
+    <h2>Game Rules and User Information</h2>
+
+    <p><strong>1. Goal of the game:</strong><br>
+    - The main goal is to play all cards from your stock pile to win the game.<br>
+    - You can play cards onto the build piles in ascending order from 1 to 12.<br>
+    - Jokers can replace any card and have no fixed value.</p>
+
+    <p><strong>2. Card types:</strong><br>
+    - Number cards: cards with values from 1 to 12.<br>
+    - Joker (★): can replace any card and is used flexibly.</p>
+
+    <p><strong>3. Card counts:</strong><br>
+    - 144 number cards (12 sets × 12 cards) + 12 jokers = 156 cards in total.</p>
+
+    <p><strong>4. Game start:</strong><br>
+    - Each player receives 5 hand cards and 20 stock cards.<br>
+    - The remaining cards form the draw pile.</p>
+
+    <p><strong>5. Gameplay:</strong><br>
+    - Players take turns playing cards onto build piles or discard piles.<br>
+    - Build piles: ascending order 1–12. A joker replaces any value.<br>
+    - A completed build pile (1–12) is cleared and shuffled back in.<br>
+    - Draw back up to 5 hand cards.<br>
+    - No legal move possible → place a card on a discard pile (mandatory).<br>
+    - Short press on a discard pile: show its contents.</p>
+
+    <p><strong>6. Player actions:</strong><br>
+    - Tap a card = select it (it lights up).<br>
+    - Tap again = deselect.<br>
+    - Tap a target pile = play the card there.<br>
+    - Move the info bar for the best view.</p>
+
+    <p><strong>7. Game speed:</strong><br>
+    - Slider: 0s (very fast) to 20s (very slow).<br>
+    - Default: 4s. For AI analysis, 6–10s is recommended.</p>
+
+    <p><strong>8. End of game:</strong><br>
+    - Whoever empties their stock first wins.<br>
+    - The loser scores 5 points per remaining stock card.</p>
+
+    <p><strong>9. Notes:</strong><br>
+    - Press for 5 seconds: reopen this info window.<br>
+    - Slide the info bar down for more space.</p>
+  `,
+pt: `
+    <h2>Regras do Jogo e Informações</h2>
+
+    <p><strong>1. Objetivo do jogo:</strong><br>
+    - O objetivo principal é jogar todas as cartas da tua pilha de reserva para vencer.<br>
+    - Podes jogar cartas nas pilhas de construção em ordem crescente, de 1 a 12.<br>
+    - Os coringas substituem qualquer carta e não têm valor fixo.</p>
+
+    <p><strong>2. Tipos de cartas:</strong><br>
+    - Cartas numéricas: valores de 1 a 12.<br>
+    - Coringa (★): substitui qualquer carta, de forma flexível.</p>
+
+    <p><strong>3. Quantidade de cartas:</strong><br>
+    - 144 cartas numéricas (12 conjuntos × 12 cartas) + 12 coringas = 156 cartas no total.</p>
+
+    <p><strong>4. Início do jogo:</strong><br>
+    - Cada jogador recebe 5 cartas na mão e 20 cartas de reserva.<br>
+    - As restantes formam a pilha de compra.</p>
+
+    <p><strong>5. Decurso do jogo:</strong><br>
+    - Os jogadores jogam alternadamente nas construções ou nos descartes.<br>
+    - Construções: ordem crescente 1–12. O coringa substitui qualquer valor.<br>
+    - Uma construção completa (1–12) é esvaziada e baralhada de volta.<br>
+    - Compra-se até ter 5 cartas na mão.<br>
+    - Sem jogada legal → colocar uma carta num descarte (obrigatório).<br>
+    - Toque curto num descarte: mostrar o conteúdo.</p>
+
+    <p><strong>6. Ações do jogador:</strong><br>
+    - Tocar numa carta = selecionar (acende).<br>
+    - Tocar de novo = cancelar a seleção.<br>
+    - Tocar na pilha de destino = jogar a carta.<br>
+    - Move a barra de informação para melhor visão.</p>
+
+    <p><strong>7. Velocidade do jogo:</strong><br>
+    - Controlo: 0s (muito rápido) a 20s (muito lento).<br>
+    - Padrão: 4s. Para análise da IA recomenda-se 6–10s.</p>
+
+    <p><strong>8. Fim do jogo:</strong><br>
+    - Vence quem esvaziar primeiro a sua reserva.<br>
+    - O perdedor recebe 5 pontos por carta de reserva restante.</p>
+
+    <p><strong>9. Dicas:</strong><br>
+    - Pressionar 5 segundos: reabrir esta janela de informação.<br>
+    - Desliza a barra de informação para baixo para mais espaço.</p>
+  `,
+uk: `
+    <h2>Правила гри та інформація</h2>
+
+    <p><strong>1. Мета гри:</strong><br>
+    - Головна мета — зіграти всі карти зі свого стосу запасу, щоб перемогти.<br>
+    - Карти кладуть на будівельні стопки у зростаючому порядку від 1 до 12.<br>
+    - Джокер замінює будь-яку карту і не має фіксованого значення.</p>
+
+    <p><strong>2. Типи карт:</strong><br>
+    - Числові карти: значення від 1 до 12.<br>
+    - Джокер (★): гнучко замінює будь-яку карту.</p>
+
+    <p><strong>3. Кількість карт:</strong><br>
+    - 144 числові карти (12 наборів × 12 карт) + 12 джокерів = 156 карт загалом.</p>
+
+    <p><strong>4. Початок гри:</strong><br>
+    - Кожен гравець отримує 5 карт у руку та 20 карт запасу.<br>
+    - Решта карт утворює колоду.</p>
+
+    <p><strong>5. Перебіг гри:</strong><br>
+    - Гравці по черзі кладуть карти на будови або у скид.<br>
+    - Будови: зростаючий порядок 1–12. Джокер замінює будь-яке значення.<br>
+    - Заповнена будова (1–12) очищується і замішується назад.<br>
+    - Добирайте карти до 5 у руці.<br>
+    - Немає дозволеного ходу → покладіть карту у скид (обов'язково).<br>
+    - Короткий дотик до скиду: показати його вміст.</p>
+
+    <p><strong>6. Дії гравця:</strong><br>
+    - Торкніться карти = вибрати (підсвічується).<br>
+    - Торкніться ще раз = скасувати вибір.<br>
+    - Торкніться цільової стопки = покласти карту туди.<br>
+    - Пересувайте панель інформації для кращого огляду.</p>
+
+    <p><strong>7. Швидкість гри:</strong><br>
+    - Повзунок: 0с (дуже швидко) до 20с (дуже повільно).<br>
+    - Стандарт: 4с. Для аналізу ШІ радимо 6–10с.</p>
+
+    <p><strong>8. Кінець гри:</strong><br>
+    - Перемагає той, хто першим спорожнить свій запас.<br>
+    - Переможений отримує 5 очок за кожну карту запасу, що лишилася.</p>
+
+    <p><strong>9. Підказки:</strong><br>
+    - Натисніть 5 секунд: знову відкрити це вікно.<br>
+    - Зсуньте панель інформації вниз, щоб мати більше місця.</p>
+  `
+  }
+};
+
+// ----------------------------------------------------------------
+// PHRASEN – kurze Bausteine, die in Meldungen eingebettet sind
+// (Quelle, Joker-Begründungen). Identische Tokens (★, Zahlen)
+// laufen unverändert durch.
+// ----------------------------------------------------------------
+const PHRASE_RULES = [
+  { re: /^✋ Hand-(\d+)$/,            en:'✋ Hand $1',           pt:'✋ Mão $1',                 uk:'✋ Рука $1' },
+  { re: /^✋ Hand$/,                  en:'✋ hand',              pt:'✋ mão',                    uk:'✋ рука' },
+  { re: /^🗃️ Stock$/,                en:'🗃️ stock',            pt:'🗃️ reserva',               uk:'🗃️ запас' },
+  { re: /^🗑️ Ablage-(\d+)$/,         en:'🗑️ Discard $1',       pt:'🗑️ Descarte $1',           uk:'🗑️ Скид $1' },
+  { re: /^🗑️ Ablage$/,               en:'🗑️ discard',          pt:'🗑️ descarte',              uk:'🗑️ скид' },
+  { re: /^★ Joker \(als (\d+)\)$/,   en:'★ Joker (as $1)',     pt:'★ Coringa (como $1)',      uk:'★ Джокер (як $1)' },
+  { re: /^★ Joker$/,                 en:'★ Joker',             pt:'★ Coringa',                uk:'★ Джокер' },
+  { re: /^direkter Stockvorteil \((\d+(?:\.\d+)?) Folgezüge\)$/,
+    en:'direct stock advantage ($1 follow-up moves)',
+    pt:'vantagem direta na reserva ($1 jogadas seguintes)',
+    uk:'пряма перевага запасу ($1 наступних ходів)' },
+  { re: /^(\d+(?:\.\d+)?) Folgezüge möglich$/,
+    en:'$1 follow-up moves possible', pt:'$1 jogadas seguintes possíveis', uk:'можливо $1 наступних ходів' },
+  { re: /^kein geeigneter Baustapel$/,
+    en:'no suitable build pile', pt:'nenhuma construção adequada', uk:'немає підходящої будови' },
+  { re: /^Kombo Score (\d+)$/,
+    en:'combo score $1', pt:'pontuação de combinação $1', uk:'комбо-рахунок $1' },
+  { re: /^kein direkter Vorteil – sicheres Ablegen$/,
+    en:'no direct advantage – safe discard', pt:'sem vantagem direta – descarte seguro', uk:'без прямої переваги – безпечний скид' }
+];
+
+function translatePhrase(s) {
+  if (LANG === 'de' || s === undefined || s === null) return s;
+  for (const r of PHRASE_RULES) {
+    const m = String(s).match(r.re);
+    if (m) return r[LANG].replace(/\$(\d)/g, (_, i) => m[i]);
+  }
+  return s;
+}
+
+// ----------------------------------------------------------------
+// MELDUNGS-REGELN – jede deutsche showMessage-Vorlage bekommt
+// ein Muster + Zielsprachen-Schablonen. $1… = Captures; Phrasen
+// werden automatisch durch translatePhrase() gejagt.
+// ----------------------------------------------------------------
+const DUKI = { Du: { en:'You', pt:'Tu', uk:'Ти' }, KI: { en:'AI', pt:'IA', uk:'ШІ' } };
+const MSG_RULES = [
+  { re: /^🎮 Spiel gestartet – du bist am Zug!$/,
+    en:'🎮 Game started – your turn!', pt:'🎮 Jogo iniciado – é a tua vez!', uk:'🎮 Гру розпочато – твій хід!' },
+  { re: /^👤 Dein Zug! – Karte auswählen$/,
+    en:'👤 Your turn! – Select a card', pt:'👤 É a tua vez! – Escolhe uma carta', uk:'👤 Твій хід! – Вибери карту' },
+  { re: /^✋ Wähle eine Karte aus deiner Hand, Stock oder Ablage$/,
+    en:'✋ Choose a card from your hand, stock or discard',
+    pt:'✋ Escolhe uma carta da mão, da reserva ou do descarte',
+    uk:'✋ Вибери карту з руки, запасу або скиду' },
+  { re: /^⏳ Warte – KI ist am Zug!$/,
+    en:'⏳ Wait – it\u2019s the AI\u2019s turn!', pt:'⏳ Espera – é a vez da IA!', uk:'⏳ Зачекай – хід ШІ!' },
+  { re: /^🤖 KI ist am Zug\.\.\.$/,
+    en:'🤖 AI is taking its turn...', pt:'🤖 A IA está a jogar...', uk:'🤖 Хід ШІ...' },
+  { re: /^🤖 KI bereitet Zug vor\.\.\.$/,
+    en:'🤖 AI is preparing its move...', pt:'🤖 A IA prepara a jogada...', uk:'🤖 ШІ готує хід...' },
+  { re: /^🔍 KI analysiert Spielfeld\.\.\.$/,
+    en:'🔍 AI is analyzing the board...', pt:'🔍 A IA analisa o tabuleiro...', uk:'🔍 ШІ аналізує поле...' },
+  { re: /^🧠 KI berechnet besten Zug\.\.\.$/,
+    en:'🧠 AI is computing the best move...', pt:'🧠 A IA calcula a melhor jogada...', uk:'🧠 ШІ обчислює найкращий хід...' },
+  { re: /^⚔️ KI plant Blockade gegen Wert (\d+)\.\.\.$/,
+    en:'⚔️ AI plans a block against value $1...', pt:'⚔️ A IA planeia bloquear o valor $1...', uk:'⚔️ ШІ планує блокувати значення $1...' },
+  { re: /^🧠 KI plant Kettenzug: (\d+) Züge, (\d+)× Stockabbau$/,
+    en:'🧠 AI plans a chain: $1 moves, $2× stock reduction',
+    pt:'🧠 A IA planeia uma cadeia: $1 jogadas, $2× redução da reserva',
+    uk:'🧠 ШІ планує ланцюжок: $1 ходів, $2× розбір запасу' },
+  { re: /^🧠 KI plant Kettenzug: (\d+) Züge – komplette Hand wird gespielt!$/,
+    en:'🧠 AI plans a chain: $1 moves – playing the entire hand!',
+    pt:'🧠 A IA planeia uma cadeia: $1 jogadas – joga a mão inteira!',
+    uk:'🧠 ШІ планує ланцюжок: $1 ходів – грає всю руку!' },
+  { re: /^🤖 KI \(Kette (\d+)\/(\d+)\): (.+) von (.+) → 🏗️ Bau (\d+)$/,
+    en:'🤖 AI (chain $1/$2): $3 from $4 → 🏗️ Build $5',
+    pt:'🤖 IA (cadeia $1/$2): $3 de $4 → 🏗️ Construção $5',
+    uk:'🤖 ШІ (ланцюжок $1/$2): $3 з $4 → 🏗️ Будова $5' },
+  { re: /^🤖 KI: (.+) von (.+) → 🏗️ Bau (\d+) \(Score: (-?\d+)\)$/,
+    en:'🤖 AI: $1 from $2 → 🏗️ Build $3 (score: $4)',
+    pt:'🤖 IA: $1 de $2 → 🏗️ Construção $3 (pontuação: $4)',
+    uk:'🤖 ШІ: $1 з $2 → 🏗️ Будова $3 (рахунок: $4)' },
+  { re: /^🔄 KI Kombinationszug #(\d+) – (.+)$/,
+    en:'🔄 AI combo move #$1 – $2', pt:'🔄 Jogada combinada da IA #$1 – $2', uk:'🔄 Комбінований хід ШІ #$1 – $2' },
+  { re: /^🗃️ KI legt Stockkarte (\d+) → 🏗️ Bau (\d+)$/,
+    en:'🗃️ AI plays stock card $1 → 🏗️ Build $2',
+    pt:'🗃️ A IA joga a carta de reserva $1 → 🏗️ Construção $2',
+    uk:'🗃️ ШІ грає карту запасу $1 → 🏗️ Будова $2' },
+  { re: /^🗃️ KI priorisiert Stockkarte (\d+) → 🏗️ Bau (\d+)$/,
+    en:'🗃️ AI prioritizes stock card $1 → 🏗️ Build $2',
+    pt:'🗃️ A IA dá prioridade à carta de reserva $1 → 🏗️ Construção $2',
+    uk:'🗃️ ШІ пріоритезує карту запасу $1 → 🏗️ Будова $2' },
+  { re: /^★ KI: Joker aus Stock → 🏗️ Bau (\d+) \((.+)\)$/,
+    en:'★ AI: joker from stock → 🏗️ Build $1 ($2)',
+    pt:'★ IA: coringa da reserva → 🏗️ Construção $1 ($2)',
+    uk:'★ ШІ: джокер із запасу → 🏗️ Будова $1 ($2)' },
+  { re: /^★ KI: Joker im Stock wird aufgespart \((.+)\)$/,
+    en:'★ AI: keeping the joker in the stock ($1)',
+    pt:'★ IA: guarda o coringa na reserva ($1)',
+    uk:'★ ШІ: береже джокер у запасі ($1)' },
+  { re: /^★ KI: Joker-Kombo! Erst Ablage (\d+), dann Joker → Bau (\d+)$/,
+    en:'★ AI: joker combo! First discard $1, then joker → Build $2',
+    pt:'★ IA: combinação de coringa! Primeiro descarte $1, depois coringa → Construção $2',
+    uk:'★ ШІ: комбо з джокером! Спершу скид $1, потім джокер → Будова $2' },
+  { re: /^★ KI: Joker → Bau (\d+) ✅$/,
+    en:'★ AI: joker → Build $1 ✅', pt:'★ IA: coringa → Construção $1 ✅', uk:'★ ШІ: джокер → Будова $1 ✅' },
+  { re: /^★ KI: Joker direkt → 🏗️ Bau (\d+)$/,
+    en:'★ AI: joker directly → 🏗️ Build $1',
+    pt:'★ IA: coringa diretamente → 🏗️ Construção $1',
+    uk:'★ ШІ: джокер одразу → 🏗️ Будова $1' },
+  { re: /^★ KI: Joker sicher → 🗑️ Ablage (\d+)$/,
+    en:'★ AI: securing joker → 🗑️ Discard $1',
+    pt:'★ IA: coringa em segurança → 🗑️ Descarte $1',
+    uk:'★ ШІ: джокер у безпеці → 🗑️ Скид $1' },
+  { re: /^★ KI: Joker gesichert auf Ablage (\d+)$/,
+    en:'★ AI: joker secured on discard $1',
+    pt:'★ IA: coringa guardado no descarte $1',
+    uk:'★ ШІ: джокер збережено у скиді $1' },
+  { re: /^🤖 KI wählt Karte (.+) zum Ablegen$/,
+    en:'🤖 AI picks card $1 to discard', pt:'🤖 A IA escolhe a carta $1 para descartar', uk:'🤖 ШІ обирає карту $1 для скиду' },
+  { re: /^🤖 KI legt (.+) → 🗑️ Ablage (\d+)$/,
+    en:'🤖 AI plays $1 → 🗑️ Discard $2', pt:'🤖 A IA joga $1 → 🗑️ Descarte $2', uk:'🤖 ШІ кладе $1 → 🗑️ Скид $2' },
+  { re: /^🤖 KI legt Karte auf Ablagestapel\.\.\.$/,
+    en:'🤖 AI is placing a card on a discard pile...',
+    pt:'🤖 A IA coloca uma carta num descarte...',
+    uk:'🤖 ШІ кладе карту у скид...' },
+  { re: /^🃏 KI hat alle Handkarten gespielt – zieht 5 neue!$/,
+    en:'🃏 AI played all hand cards – drawing 5 new ones!',
+    pt:'🃏 A IA jogou todas as cartas da mão – compra 5 novas!',
+    uk:'🃏 ШІ зіграв усі карти руки – бере 5 нових!' },
+  { re: /^🃏 KI zieht Karten nach\.\.\.$/,
+    en:'🃏 AI is drawing cards...', pt:'🃏 A IA compra cartas...', uk:'🃏 ШІ добирає карти...' },
+  { re: /^ℹ️ KI hat keine Handkarten mehr – kein Pflichtablegen$/,
+    en:'ℹ️ AI has no hand cards left – no mandatory discard',
+    pt:'ℹ️ A IA não tem cartas na mão – sem descarte obrigatório',
+    uk:'ℹ️ У ШІ не лишилося карт у руці – обов\u2019язковий скид не потрібен' },
+  { re: /^✅ KI beendet Zug – Spielerwechsel$/,
+    en:'✅ AI ends its turn – switching players', pt:'✅ A IA termina a jogada – troca de jogador', uk:'✅ ШІ завершує хід – зміна гравця' },
+  { re: /^✅ (.+) aus (.+) gewählt – Ziel antippen$/,
+    en:'✅ $1 selected from $2 – tap a target',
+    pt:'✅ $1 escolhida de $2 – toca no destino',
+    uk:'✅ $1 вибрано з $2 – торкнись цілі' },
+  { re: /^✅ Karte (.+) → 🏗️ Bau (\d+)$/,
+    en:'✅ Card $1 → 🏗️ Build $2', pt:'✅ Carta $1 → 🏗️ Construção $2', uk:'✅ Карта $1 → 🏗️ Будова $2' },
+  { re: /^✅ Karte (.+) → 🗑️ Ablage (\d+) – KI am Zug$/,
+    en:'✅ Card $1 → 🗑️ Discard $2 – AI\u2019s turn',
+    pt:'✅ Carta $1 → 🗑️ Descarte $2 – vez da IA',
+    uk:'✅ Карта $1 → 🗑️ Скид $2 – хід ШІ' },
+  { re: /^❌ Auswahl aufgehoben$/,
+    en:'❌ Selection cancelled', pt:'❌ Seleção cancelada', uk:'❌ Вибір скасовано' },
+  { re: /^❌ Dieser Zug ist nicht erlaubt$/,
+    en:'❌ This move is not allowed', pt:'❌ Esta jogada não é permitida', uk:'❌ Цей хід заборонено' },
+  { re: /^❌ (Du|KI): Stockkarten darf nicht abgelegt werden!$/,
+    en:'❌ $1: stock cards must not be discarded!',
+    pt:'❌ $1: cartas de reserva não podem ir para o descarte!',
+    uk:'❌ $1: карти запасу не можна скидати!',
+    map1: DUKI },
+  { re: /^⚠️ Bitte zuerst eine Karte auswählen$/,
+    en:'⚠️ Please select a card first', pt:'⚠️ Primeiro escolhe uma carta', uk:'⚠️ Спочатку вибери карту' },
+  { re: /^⚠️ Keine Handkarten zum Ablegen$/,
+    en:'⚠️ No hand cards to discard', pt:'⚠️ Sem cartas na mão para descartar', uk:'⚠️ Немає карт у руці для скиду' },
+  { re: /^⚠️ Ablage fehlgeschlagen!$/,
+    en:'⚠️ Discard failed!', pt:'⚠️ Falha no descarte!', uk:'⚠️ Скид не вдався!' },
+  { re: /^✅ Spielername geändert: (.+)$/,
+    en:'✅ Player name changed: $1', pt:'✅ Nome do jogador alterado: $1', uk:"✅ Ім'я гравця змінено: $1" },
+  { re: /^📊 Auswertung zurückgesetzt – 5 neue Spiele werden gesammelt$/,
+    en:'📊 Evaluation reset – collecting 5 new games',
+    pt:'📊 Avaliação reposta – a recolher 5 novos jogos',
+    uk:'📊 Аналіз скинуто – збираються 5 нових ігор' },
+  { re: /^🎯 (KI|Spieler): Karte (.+) → Bau (\d+) \(Score: (-?\d+)\)$/,
+    en:'🎯 $1: card $2 → Build $3 (score: $4)',
+    pt:'🎯 $1: carta $2 → Construção $3 (pontuação: $4)',
+    uk:'🎯 $1: карта $2 → Будова $3 (рахунок: $4)',
+    map1: { KI: { en:'AI', pt:'IA', uk:'ШІ' }, Spieler: { en:'Player', pt:'Jogador', uk:'Гравець' } } },
+  { re: /^🎮 Spielstart: Karten werden gemischt\.\.\.$/,
+    en:'🎮 Game start: shuffling cards...', pt:'🎮 Início do jogo: a baralhar cartas...', uk:'🎮 Початок гри: тасуємо карти...' }
+];
+
+/**
+ * translateMessage(text) – Deutsche Meldung in die aktive Sprache übersetzen.
+ * Bei Deutsch oder unbekannter Vorlage: Originaltext (failsafe).
+ */
+function translateMessage(text) {
+  if (LANG === 'de' || typeof text !== 'string') return text;
+  for (const r of MSG_RULES) {
+    const m = text.match(r.re);
+    if (!m) continue;
+    return r[LANG].replace(/\$(\d)/g, (_, iStr) => {
+      const i = parseInt(iStr);
+      let v = m[i];
+      if (i === 1 && r.map1 && r.map1[v]) return r.map1[v][LANG];
+      return translatePhrase(v);
+    });
+  }
+  return text;
+}
+
+// ----------------------------------------------------------------
+// FELD-BESCHRIFTUNGEN – sprachecht + Live-Zähler
+// ----------------------------------------------------------------
+/**
+ * refreshFieldLabels() – setzt alle data-label-Texte aus dem aktuellen
+ * Spielzustand neu (Sprache + Kartenzähler). Wird am Ende von
+ * updateView() und beim Sprachwechsel aufgerufen.
+ */
+function refreshFieldLabels() {
+  if (typeof Game === 'undefined' || !Game.players) return;
+  const set = (el, txt) => { if (el) el.setAttribute('data-label', txt); };
+  const nextNeeded = pile => {
+    if (!pile || pile.length === 0) return 1;
+    const top = pile[pile.length - 1];
+    const v = top.type === 'joker' ? pile.length : top.value;
+    return v >= 12 ? 1 : v + 1;
+  };
+  set(document.querySelector('.opponent-area .field.stock'),
+      t('lblStockOpp', Game.players.ai.stock.length));
+  set(document.querySelector('.human-area .field.stock'),
+      t('lblStockSelf', Game.players.human.stock.length));
+  document.querySelectorAll('.opponent-area .discard-field').forEach((el, i) =>
+    set(el, t('lblAblage', i + 1)));
+  document.querySelectorAll('.human-area .discard-field').forEach((el, i) =>
+    set(el, t('lblAblage', i + 1)));
+  set(document.querySelector('.build-area .field.draw-pile'),
+      t('lblNachzieh', Game.drawPile.length));
+  document.querySelectorAll('.build-area .field.build-pile').forEach((el, i) =>
+    set(el, t('lblBau', i + 1, nextNeeded(Game.buildPiles[i]))));
+}
+
+// ----------------------------------------------------------------
+// SPRACHE WECHSELN
+// ----------------------------------------------------------------
+/**
+ * applyStaticTranslations() – Menü, Overlay und Initialstatus in die
+ * aktive Sprache bringen. Idempotent; wird bei Start und Wechsel gerufen.
+ */
+function applyStaticTranslations() {
+  const setTxt = (id, key) => { const el = document.getElementById(id); if (el) el.textContent = t(key); };
+  setTxt('qm-settings', 'qmSettings');
+  setTxt('qm-design',   'qmDesign');
+  setTxt('qm-rules',    'qmRules');
+  setTxt('qm-lang',     'qmLang');
+  setTxt('qm-newgame',  'qmNewGame');
+  setTxt('qm-tuner',    'qmTuner');
+  setTxt('qm-imprint',  'qmImprint');
+  setTxt('qm-privacy',  'qmPrivacy');
+  setTxt('qm-close',    'qmClose');
+  // Einstellungs-Overlay (falls bereits erzeugt) neu beschriften
+  const ovApply = document.getElementById('btn-uebernehmen');
+  if (ovApply) ovApply.textContent = t('btnApply');
+  const ovClose = document.getElementById('btn-schliessen');
+  if (ovClose) ovClose.textContent = t('btnClose');
+  const ovName = document.getElementById('input-name');
+  if (ovName) ovName.placeholder = t('phName');
+  const ovSpeed = document.querySelector('.speed-label');
+  if (ovSpeed) ovSpeed.textContent = t('speedLabel');
+  const ovInfo = document.getElementById('overlay-info');
+  if (ovInfo) ovInfo.innerHTML = t('rulesHtml');
+}
+
+/**
+ * setLanguage(lang) – Aktive Sprache setzen, speichern, UI auffrischen.
+ */
+function setLanguage(lang) {
+  if (!['de', 'en', 'pt', 'uk'].includes(lang)) return;
+  LANG = lang;
+  try { localStorage.setItem('skipbo-lang', lang); } catch (e) {}
+  applyStaticTranslations();
+  refreshFieldLabels();
+  const lo = document.getElementById('lang-overlay');
+  if (lo) lo.style.display = 'none';
+  showMessage(t('langSet'));
+}
+
+/**
+ * menuSprache() – Menüpunkt: Sprach-Auswahl anzeigen.
+ */
+function menuSprache() {
+  closeQuickMenu();
+  let lo = document.getElementById('lang-overlay');
+  if (!lo) {
+    lo = document.createElement('div');
+    lo.id = 'lang-overlay';
+    Object.assign(lo.style, {
+      position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.65)',
+      zIndex: '3500', display: 'flex', alignItems: 'center', justifyContent: 'center'
+    });
+    const btn = (code, flag) => `
+      <button data-lang="${code}" style="
+        display:flex; align-items:center; gap:10px; width:100%;
+        padding:12px 16px; margin:6px 0; font-size:1.05em; cursor:pointer;
+        background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(255,255,255,0.25);
+        border-radius:10px; touch-action:manipulation;
+      ">${flag} ${T.langName[code]}</button>`;
+    lo.innerHTML = `
+      <div style="background:#1a2a1d; border:1px solid rgba(255,255,255,0.3);
+                  border-radius:14px; padding:18px 20px; width:82%; max-width:320px;
+                  box-shadow:0 8px 28px rgba(0,0,0,0.6); color:#fff;">
+        <div id="lang-title" style="font-weight:bold; margin-bottom:10px; text-align:center;">
+          ${t('langTitle')}</div>
+        ${btn('de', '🇩🇪')}${btn('en', '🇬🇧')}${btn('pt', '🇵🇹')}${btn('uk', '🇺🇦')}
+        <button id="lang-cancel" style="width:100%; padding:10px; margin-top:8px;
+          background:transparent; color:rgba(255,120,120,0.95); border:none;
+          font-size:0.95em; cursor:pointer;">✕</button>
+      </div>`;
+    document.body.appendChild(lo);
+    lo.querySelectorAll('button[data-lang]').forEach(b => {
+      const choose = e => { e.preventDefault(); setLanguage(b.getAttribute('data-lang')); };
+      b.addEventListener('click', choose);
+      b.addEventListener('touchstart', choose, { passive: false });
+    });
+    const cancel = lo.querySelector('#lang-cancel');
+    cancel.addEventListener('click', () => { lo.style.display = 'none'; });
+    lo.addEventListener('click', e => { if (e.target === lo) lo.style.display = 'none'; });
+  } else {
+    const title = lo.querySelector('#lang-title');
+    if (title) title.textContent = t('langTitle');
+    lo.style.display = 'flex';
+  }
+}
+
+// Beim Laden: gespeicherte Sprache sofort auf Menü & Labels anwenden
+document.addEventListener('DOMContentLoaded', () => {
+  applyStaticTranslations();
+  // Initial-Status nur ersetzen, solange noch der Starttext steht
+  const st = document.getElementById('status-text');
+  if (st && /Spielstart/.test(st.textContent)) {
+    st.textContent = translateMessage('🎮 Spielstart: Karten werden gemischt...');
+  }
+});
