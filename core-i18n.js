@@ -1,0 +1,379 @@
+// ================================================================
+//  core-i18n.js  –  Skipo 7.0.1   Namensraum: I18n
+//  SPRACHMODUL – drei Sprachen: Deutsch (Quelle), English, Português
+// ----------------------------------------------------------------
+//  Braucht: Events, Settings     Bietet: I18n.t / say / setLang
+//
+//  Regel 4 der Architektur: Meldungen sind SCHLÜSSEL, keine Sätze.
+//    I18n.t('aiBuild', karte, quelle, 2, 1500)  → fertiger Text
+//    I18n.say('aiBuild', ...)                    → Ereignis "msg"
+//  Platzhalter {0}, {1}, … werden der Reihe nach ersetzt.
+//  Spiellogik ruft nur say(); die Anzeige (Render) übersetzt beim
+//  Anzeigen mit t(). Es gibt keinen Regex-Übersetzer mehr.
+//
+//  Neue Meldung ergänzen = hier EIN Eintrag mit de/en/pt.
+// ================================================================
+
+const I18n = {
+  LANGS: ['de', 'en', 'pt'],
+  lang:  'de',
+
+  /** Sprache aus Settings übernehmen (beim Start). */
+  init() {
+    this.lang = this.LANGS.includes(Settings.lang) ? Settings.lang : 'de';
+  },
+
+  /** Text zum Schlüssel in der aktiven Sprache; Platzhalter {n} füllen. */
+  t(key, ...args) {
+    const entry = this.T[key];
+    let s = entry ? (entry[this.lang] ?? entry.de) : key;
+    return s.replace(/\{(\d)\}/g, (_, i) => args[i] !== undefined ? args[i] : '');
+  },
+
+  /** Meldung als Ereignis senden (die Anzeige übersetzt). */
+  say(key, ...args) {
+    Events.emit('msg', { key, args });
+  },
+
+  /** Sprache wechseln, speichern, Ereignis senden. */
+  setLang(lang) {
+    if (!this.LANGS.includes(lang)) return false;
+    this.lang = lang;
+    Settings.set('lang', lang);
+    Events.emit('lang:change', lang);
+    return true;
+  },
+
+  // ----------------------------------------------------------------
+  // WÖRTERBUCH
+  // ----------------------------------------------------------------
+  T: {
+    // ── Allgemein ──
+    joker:        { de:'Joker', en:'Joker', pt:'Coringa' },
+    you:          { de:'Du', en:'You', pt:'Tu' },
+    ai:           { de:'KI', en:'AI', pt:'IA' },
+    empty:        { de:'Leer', en:'Empty', pt:'Vazio' },
+    langName:     { de:'Deutsch', en:'English', pt:'Português' },
+    langSet:      { de:'🌐 Sprache: Deutsch', en:'🌐 Language: English', pt:'🌐 Idioma: Português' },
+    langTitle:    { de:'🌐 Sprache wählen', en:'🌐 Choose language', pt:'🌐 Escolher idioma' },
+
+    // ── Schnellmenü ──
+    qmSettings:   { de:'⚙️ Einstellungen', en:'⚙️ Settings', pt:'⚙️ Definições' },
+    qmDesign:     { de:'🎨 Design', en:'🎨 Design', pt:'🎨 Design' },
+    qmRules:      { de:'📖 Spielregeln', en:'📖 Game rules', pt:'📖 Regras do jogo' },
+    qmLang:       { de:'🌐 Sprache / Language', en:'🌐 Language', pt:'🌐 Idioma' },
+    qmNewGame:    { de:'🔄 Neues Spiel', en:'🔄 New game', pt:'🔄 Novo jogo' },
+    qmTuner:      { de:'📊 Auswertung zurücksetzen', en:'📊 Reset evaluation', pt:'📊 Repor avaliação' },
+    qmImprint:    { de:'📄 Impressum', en:'📄 Legal notice', pt:'📄 Aviso legal' },
+    qmPrivacy:    { de:'🔒 Datenschutz', en:'🔒 Privacy', pt:'🔒 Privacidade' },
+    qmClose:      { de:'✕ Schließen', en:'✕ Close', pt:'✕ Fechar' },
+
+    // ── Design-Bedienfeld ──
+    designTitle:  { de:'Hintergrund-Design', en:'Background design', pt:'Design de fundo' },
+    designThemes: { de:'Themen', en:'Themes', pt:'Temas' },
+    designFine:   { de:'Feinjustierung', en:'Fine-tuning', pt:'Ajuste fino' },
+    designBright: { de:'Helligkeit', en:'Brightness', pt:'Brilho' },
+    designHue:    { de:'Farbton', en:'Hue', pt:'Matiz' },
+    designDone:   { de:'Fertig', en:'Done', pt:'Concluído' },
+
+    // ── Einstellungen ──
+    btnApply:     { de:'Übernehmen', en:'Apply', pt:'Aplicar' },
+    btnClose:     { de:'Schließen', en:'Close', pt:'Fechar' },
+    phName:       { de:'Spielername', en:'Player name', pt:'Nome do jogador' },
+    speedLabel:   { de:'Geschwindigkeit (0–20s)', en:'Speed (0–20s)', pt:'Velocidade (0–20s)' },
+
+    // ── Bestätigungen ──
+    confirmNewGame:    { de:'Neues Spiel starten? Das aktuelle Spiel wird beendet.',
+                         en:'Start a new game? The current game will end.',
+                         pt:'Iniciar um novo jogo? O jogo atual será terminado.' },
+    confirmTunerReset: { de:'Tuner-Auswertung zurücksetzen? Die gesammelten Daten von {0} Spielen werden gelöscht.',
+                         en:'Reset tuner evaluation? Collected data from {0} games will be deleted.',
+                         pt:'Repor a avaliação do tuner? Os dados de {0} jogos serão apagados.' },
+
+    // ── Spielende ──
+    endTitle:     { de:'🏁 Spiel beendet!', en:'🏁 Game over!', pt:'🏁 Fim do jogo!' },
+    winner:       { de:'Gewinner', en:'Winner', pt:'Vencedor' },
+    loser:        { de:'Verlierer', en:'Loser', pt:'Perdedor' },
+    withPoints:   { de:'mit <strong>{0} Punkten</strong>', en:'with <strong>{0} points</strong>', pt:'com <strong>{0} pontos</strong>' },
+    btnNewGame:   { de:'🔄 Neues Spiel', en:'🔄 New game', pt:'🔄 Novo jogo' },
+    btnTunerReady:{ de:'📊 Tuner-Auswertung ({0} Spiele)', en:'📊 Tuner evaluation ({0} games)', pt:'📊 Avaliação do tuner ({0} jogos)' },
+    btnTunerWait: { de:'📊 Noch {0} Spiele bis Auswertung', en:'📊 {0} more games until evaluation', pt:'📊 Faltam {0} jogos para a avaliação' },
+
+    // ── Tuner-Auswertung ──
+    taHeader:     { de:'📊 Auswertung: {0} Spiele · KI-Siegrate: {1}%', en:'📊 Evaluation: {0} games · AI win rate: {1}%', pt:'📊 Avaliação: {0} jogos · Taxa de vitória da IA: {1}%' },
+    taNeedMore:   { de:'Noch {0} Spiele bis zur Auswertung.', en:'{0} more games until evaluation.', pt:'Faltam {0} jogos para a avaliação.' },
+    taTotal:      { de:'Spiele insgesamt', en:'Total games', pt:'Total de jogos' },
+    taPerGame:    { de:'Spiel', en:'game', pt:'jogo' },
+    taPlayed:     { de:'Gespielt', en:'Played', pt:'Jogados' },
+    taWasted:     { de:'Davon verschwendet', en:'Of which wasted', pt:'Dos quais desperdiçados' },
+    taOverall:    { de:'Insgesamt', en:'Total', pt:'Total' },
+    taLaid:       { de:'Gelegt', en:'Played', pt:'Colocadas' },
+    taMissed:     { de:'Verpasst', en:'Missed', pt:'Falhadas' },
+    taDiscToBuild:{ de:'Ablage→Bau gesamt', en:'Discard→Build total', pt:'Descarte→Construção total' },
+    taHandToBuild:{ de:'Hand→Bau gesamt', en:'Hand→Build total', pt:'Mão→Construção total' },
+    taFooter:     { de:'Nach dem Einstellen der Tuner-Slider: Auswertung zurücksetzen<br>(⚙️-Menü → Auswertung zurücksetzen)',
+                    en:'After adjusting the tuner sliders: reset the evaluation<br>(⚙️ menu → Reset evaluation)',
+                    pt:'Depois de ajustar os controlos do tuner: repor a avaliação<br>(menu ⚙️ → Repor avaliação)' },
+    taJokerTitle: { de:'Joker', en:'Jokers', pt:'Coringas' },
+    taJokerBad:   { de:'Joker oft verschwendet', en:'Jokers often wasted', pt:'Coringas muitas vezes desperdiçados' },
+    taJokerBadTip:{ de:'→ Tuner: <b>Joker-Slider senken</b> (KI ist zu aggressiv beim Joker-Einsatz)',
+                    en:'→ Tuner: <b>lower the joker slider</b> (AI plays jokers too aggressively)',
+                    pt:'→ Tuner: <b>baixar o controlo de coringas</b> (a IA usa coringas de forma demasiado agressiva)' },
+    taJokerFew:   { de:'Joker selten gespielt', en:'Jokers rarely played', pt:'Coringas raramente jogados' },
+    taJokerFewTip:{ de:'→ Tuner: <b>Joker-Slider leicht erhöhen</b> (KI nutzt Joker zu selten)',
+                    en:'→ Tuner: <b>raise the joker slider slightly</b> (AI uses jokers too rarely)',
+                    pt:'→ Tuner: <b>aumentar ligeiramente o controlo de coringas</b> (a IA usa coringas raramente)' },
+    taJokerOk:    { de:'Joker-Einsatz gut', en:'Joker use is good', pt:'Bom uso de coringas' },
+    taJokerOkTip: { de:'→ Tuner: <b>Joker-Slider passt</b> (kein Anpassungsbedarf)',
+                    en:'→ Tuner: <b>joker slider is fine</b> (no change needed)',
+                    pt:'→ Tuner: <b>controlo de coringas adequado</b> (sem necessidade de ajuste)' },
+    taHelpTitle:  { de:'Gegnerhilfe', en:'Helping opponent', pt:'Ajuda ao adversário' },
+    taHelpBad:    { de:'KI hilft Gegner oft', en:'AI often helps the opponent', pt:'A IA ajuda o adversário com frequência' },
+    taHelpBadTip: { de:'→ Tuner: <b>Defensiv-Slider erhöhen</b> (mehr Blockade-Vorsicht)',
+                    en:'→ Tuner: <b>raise the defensive slider</b> (more blocking caution)',
+                    pt:'→ Tuner: <b>aumentar o controlo defensivo</b> (mais cuidado com bloqueios)' },
+    taHelpSome:   { de:'KI hilft Gegner manchmal', en:'AI sometimes helps the opponent', pt:'A IA ajuda o adversário às vezes' },
+    taHelpSomeTip:{ de:'→ Tuner: <b>Defensiv-Slider leicht erhöhen</b>', en:'→ Tuner: <b>raise the defensive slider slightly</b>', pt:'→ Tuner: <b>aumentar ligeiramente o controlo defensivo</b>' },
+    taHelpOk:     { de:'Gegnerhilfe gering', en:'Little help to opponent', pt:'Pouca ajuda ao adversário' },
+    taHelpOkTip:  { de:'→ Tuner: <b>Defensiv-Slider passt</b>', en:'→ Tuner: <b>defensive slider is fine</b>', pt:'→ Tuner: <b>controlo defensivo adequado</b>' },
+    taStockTitle: { de:'Stockabbau', en:'Stock reduction', pt:'Redução da reserva' },
+    taStockBad:   { de:'Viele verpasste Stockzüge', en:'Many missed stock plays', pt:'Muitas jogadas de reserva falhadas' },
+    taStockBadTip:{ de:'→ Tuner: <b>Stockabbau-Slider erhöhen</b> (KI priorisiert Stock zu wenig)',
+                    en:'→ Tuner: <b>raise the stock slider</b> (AI prioritizes the stock too little)',
+                    pt:'→ Tuner: <b>aumentar o controlo de reserva</b> (a IA dá pouca prioridade à reserva)' },
+    taStockSome:  { de:'Einige verpasste Stockzüge', en:'Some missed stock plays', pt:'Algumas jogadas de reserva falhadas' },
+    taStockSomeTip:{ de:'→ Tuner: <b>Stockabbau-Slider leicht erhöhen</b>', en:'→ Tuner: <b>raise the stock slider slightly</b>', pt:'→ Tuner: <b>aumentar ligeiramente o controlo de reserva</b>' },
+    taStockOk:    { de:'Stockabbau effizient', en:'Stock reduction efficient', pt:'Redução da reserva eficiente' },
+    taStockOkTip: { de:'→ Tuner: <b>Stockabbau-Slider passt</b>', en:'→ Tuner: <b>stock slider is fine</b>', pt:'→ Tuner: <b>controlo de reserva adequado</b>' },
+    taComboTitle: { de:'Kombinationszüge', en:'Combo moves', pt:'Jogadas combinadas' },
+    taComboFew:   { de:'Wenige Kombinations-Züge', en:'Few combo moves', pt:'Poucas jogadas combinadas' },
+    taComboFewTip:{ de:'→ Tuner: <b>Kombinations-Slider erhöhen</b> (Ablagestapel besser nutzen)',
+                    en:'→ Tuner: <b>raise the combo slider</b> (use discard piles better)',
+                    pt:'→ Tuner: <b>aumentar o controlo de combinações</b> (aproveitar melhor as pilhas de descarte)' },
+    taComboMany:  { de:'Sehr viele Kombinations-Züge', en:'Very many combo moves', pt:'Muitíssimas jogadas combinadas' },
+    taComboManyTip:{ de:'→ Tuner: <b>Kombinations-Slider etwas senken</b> (Balance prüfen)',
+                     en:'→ Tuner: <b>lower the combo slider a little</b> (check balance)',
+                     pt:'→ Tuner: <b>baixar um pouco o controlo de combinações</b> (verificar o equilíbrio)' },
+    taComboOk:    { de:'Kombinationen ausgewogen', en:'Combos balanced', pt:'Combinações equilibradas' },
+    taComboOkTip: { de:'→ Tuner: <b>Kombinations-Slider passt</b>', en:'→ Tuner: <b>combo slider is fine</b>', pt:'→ Tuner: <b>controlo de combinações adequado</b>' },
+    taHandTitle:  { de:'Handkarten', en:'Hand cards', pt:'Cartas da mão' },
+    taHandFew:    { de:'Handkarten wenig genutzt', en:'Hand cards little used', pt:'Cartas da mão pouco usadas' },
+    taHandFewTip: { de:'→ Tuner: <b>Handkarten-Slider erhöhen</b> (mehr Handkarten auf Baustapel legen)',
+                    en:'→ Tuner: <b>raise the hand slider</b> (play more hand cards to build piles)',
+                    pt:'→ Tuner: <b>aumentar o controlo da mão</b> (jogar mais cartas da mão nas construções)' },
+    taHandOk:     { de:'Handkarten gut genutzt', en:'Hand cards well used', pt:'Cartas da mão bem usadas' },
+    taHandOkTip:  { de:'→ Tuner: <b>Handkarten-Slider passt</b>', en:'→ Tuner: <b>hand slider is fine</b>', pt:'→ Tuner: <b>controlo da mão adequado</b>' },
+
+    // ── Feldbeschriftungen (Live-Zähler) ──
+    lblStockOpp:  { de:'🗃️ Gegner Stock ({0})', en:'🗃️ Opponent stock ({0})', pt:'🗃️ Reserva do adversário ({0})' },
+    lblStockSelf: { de:' Spieler Stock ({0})', en:' Your stock ({0})', pt:' A tua reserva ({0})' },
+    lblAblage:    { de:'🗑️ Ablage {0}', en:'🗑️ Discard {0}', pt:'🗑️ Descarte {0}' },
+    lblBau:       { de:'▲ Bau {0} ({1})', en:'▲ Build {0} ({1})', pt:'▲ Construção {0} ({1})' },
+    lblNachzieh:  { de:'🃏 Nachziehstapel ({0})', en:'🃏 Draw pile ({0})', pt:'🃏 Pilha de compra ({0})' },
+    tagBlock:     { de:'⛔ Blockade {0} ({1}%)', en:'⛔ Block {0} ({1}%)', pt:'⛔ Bloqueio {0} ({1}%)' },
+
+    // ── Quellen- und Kartenbezeichnungen (Bausteine für Meldungen) ──
+    srcHandN:     { de:'✋ Hand-{0}', en:'✋ Hand {0}', pt:'✋ Mão {0}' },
+    srcHand:      { de:'✋ Hand', en:'✋ hand', pt:'✋ mão' },
+    srcStock:     { de:'🗃️ Stock', en:'🗃️ stock', pt:'🗃️ reserva' },
+    srcDiscardN:  { de:'🗑️ Ablage-{0}', en:'🗑️ Discard {0}', pt:'🗑️ Descarte {0}' },
+    srcDiscard:   { de:'🗑️ Ablage', en:'🗑️ discard', pt:'🗑️ descarte' },
+    jokerLabel:   { de:'★ Joker', en:'★ Joker', pt:'★ Coringa' },
+    jokerAs:      { de:'★ Joker (als {0})', en:'★ Joker (as {0})', pt:'★ Coringa (como {0})' },
+
+    // ── KI-Begründungen (Joker) ──
+    rsnStockAdv:  { de:'direkter Stockvorteil ({0} Folgezüge)', en:'direct stock advantage ({0} follow-up moves)', pt:'vantagem direta na reserva ({0} jogadas seguintes)' },
+    rsnFollow:    { de:'{0} Folgezüge möglich', en:'{0} follow-up moves possible', pt:'{0} jogadas seguintes possíveis' },
+    rsnNoPile:    { de:'kein geeigneter Baustapel', en:'no suitable build pile', pt:'nenhuma construção adequada' },
+    rsnCombo:     { de:'Kombo Score {0}', en:'combo score {0}', pt:'pontuação de combinação {0}' },
+    rsnSafe:      { de:'kein direkter Vorteil – sicheres Ablegen', en:'no direct advantage – safe discard', pt:'sem vantagem direta – descarte seguro' },
+
+    // ── Statusmeldungen: Spielablauf ──
+    shuffling:    { de:'🎮 Spielstart: Karten werden gemischt...', en:'🎮 Game start: shuffling cards...', pt:'🎮 Início do jogo: a baralhar cartas...' },
+    gameStart:    { de:'🎮 Spiel gestartet – du bist am Zug!', en:'🎮 Game started – your turn!', pt:'🎮 Jogo iniciado – é a tua vez!' },
+    yourTurn:     { de:'👤 Dein Zug! – Karte auswählen', en:'👤 Your turn! – Select a card', pt:'👤 É a tua vez! – Escolhe uma carta' },
+    chooseCard:   { de:'✋ Wähle eine Karte aus deiner Hand, Stock oder Ablage', en:'✋ Choose a card from your hand, stock or discard', pt:'✋ Escolhe uma carta da mão, da reserva ou do descarte' },
+    waitAi:       { de:'⏳ Warte – KI ist am Zug!', en:'⏳ Wait – it\u2019s the AI\u2019s turn!', pt:'⏳ Espera – é a vez da IA!' },
+    aiTurn:       { de:'🤖 KI ist am Zug...', en:'🤖 AI is taking its turn...', pt:'🤖 A IA está a jogar...' },
+    noMoveAuto:   { de:'ℹ️ Keine Handkarte und kein Bauzug möglich – KI ist am Zug', en:'ℹ️ No hand card and no build move possible – AI\u2019s turn', pt:'ℹ️ Sem carta na mão e sem jogada possível – vez da IA' },
+
+    // ── Statusmeldungen: Spieler ──
+    selected:     { de:'✅ {0} aus {1} gewählt – Ziel antippen', en:'✅ {0} selected from {1} – tap a target', pt:'✅ {0} escolhida de {1} – toca no destino' },
+    deselected:   { de:'❌ Auswahl aufgehoben', en:'❌ Selection cancelled', pt:'❌ Seleção cancelada' },
+    cardToBuild:  { de:'✅ Karte {0} → 🏗️ Bau {1}', en:'✅ Card {0} → 🏗️ Build {1}', pt:'✅ Carta {0} → 🏗️ Construção {1}' },
+    cardToDiscard:{ de:'✅ Karte {0} → 🗑️ Ablage {1} – KI am Zug', en:'✅ Card {0} → 🗑️ Discard {1} – AI\u2019s turn', pt:'✅ Carta {0} → 🗑️ Descarte {1} – vez da IA' },
+    notAllowed:   { de:'❌ Dieser Zug ist nicht erlaubt', en:'❌ This move is not allowed', pt:'❌ Esta jogada não é permitida' },
+    stockNoDiscard:{ de:'❌ {0}: Stockkarten dürfen nicht abgelegt werden!', en:'❌ {0}: stock cards must not be discarded!', pt:'❌ {0}: cartas de reserva não podem ir para o descarte!' },
+    selectFirst:  { de:'⚠️ Bitte zuerst eine Karte auswählen', en:'⚠️ Please select a card first', pt:'⚠️ Primeiro escolhe uma carta' },
+    nameChanged:  { de:'✅ Spielername geändert: {0}', en:'✅ Player name changed: {0}', pt:'✅ Nome do jogador alterado: {0}' },
+    tunerReset:   { de:'📊 Auswertung zurückgesetzt – 5 neue Spiele werden gesammelt', en:'📊 Evaluation reset – collecting 5 new games', pt:'📊 Avaliação reposta – a recolher 5 novos jogos' },
+
+    // ── Statusmeldungen: KI ──
+    aiPrepare:    { de:'🤖 KI bereitet Zug vor...', en:'🤖 AI is preparing its move...', pt:'🤖 A IA prepara a jogada...' },
+    aiAnalyze:    { de:'🔍 KI analysiert Spielfeld...', en:'🔍 AI is analyzing the board...', pt:'🔍 A IA analisa o tabuleiro...' },
+    aiCompute:    { de:'🧠 KI berechnet besten Zug...', en:'🧠 AI is computing the best move...', pt:'🧠 A IA calcula a melhor jogada...' },
+    aiBlockPlan:  { de:'⚔️ KI plant Blockade gegen Wert {0}...', en:'⚔️ AI plans a block against value {0}...', pt:'⚔️ A IA planeia bloquear o valor {0}...' },
+    aiChainStock: { de:'🧠 KI plant Kettenzug: {0} Züge, {1}× Stockabbau', en:'🧠 AI plans a chain: {0} moves, {1}× stock reduction', pt:'🧠 A IA planeia uma cadeia: {0} jogadas, {1}× redução da reserva' },
+    aiChainClear: { de:'🧠 KI plant Kettenzug: {0} Züge – komplette Hand wird gespielt!', en:'🧠 AI plans a chain: {0} moves – playing the entire hand!', pt:'🧠 A IA planeia uma cadeia: {0} jogadas – joga a mão inteira!' },
+    aiChainMove:  { de:'🤖 KI (Kette {0}/{1}): {2} von {3} → 🏗️ Bau {4}', en:'🤖 AI (chain {0}/{1}): {2} from {3} → 🏗️ Build {4}', pt:'🤖 IA (cadeia {0}/{1}): {2} de {3} → 🏗️ Construção {4}' },
+    aiBuild:      { de:'🤖 KI: {0} von {1} → 🏗️ Bau {2} (Score: {3})', en:'🤖 AI: {0} from {1} → 🏗️ Build {2} (score: {3})', pt:'🤖 IA: {0} de {1} → 🏗️ Construção {2} (pontuação: {3})' },
+    aiCombo:      { de:'🔄 KI Kombinationszug #{0} – {1}', en:'🔄 AI combo move #{0} – {1}', pt:'🔄 Jogada combinada da IA #{0} – {1}' },
+    aiStockPlay:  { de:'🗃️ KI legt Stockkarte {0} → 🏗️ Bau {1}', en:'🗃️ AI plays stock card {0} → 🏗️ Build {1}', pt:'🗃️ A IA joga a carta de reserva {0} → 🏗️ Construção {1}' },
+    aiStockPrio:  { de:'🗃️ KI priorisiert Stockkarte {0} → 🏗️ Bau {1}', en:'🗃️ AI prioritizes stock card {0} → 🏗️ Build {1}', pt:'🗃️ A IA dá prioridade à carta de reserva {0} → 🏗️ Construção {1}' },
+    aiJokerStock: { de:'★ KI: Joker aus Stock → 🏗️ Bau {0} ({1})', en:'★ AI: joker from stock → 🏗️ Build {0} ({1})', pt:'★ IA: coringa da reserva → 🏗️ Construção {0} ({1})' },
+    aiJokerKeep:  { de:'★ KI: Joker im Stock wird aufgespart ({0})', en:'★ AI: keeping the joker in the stock ({0})', pt:'★ IA: guarda o coringa na reserva ({0})' },
+    aiJokerCombo: { de:'★ KI: Joker-Kombo! Erst Ablage {0}, dann Joker → Bau {1}', en:'★ AI: joker combo! First discard {0}, then joker → Build {1}', pt:'★ IA: combinação de coringa! Primeiro descarte {0}, depois coringa → Construção {1}' },
+    aiJokerDone:  { de:'★ KI: Joker → Bau {0} ✅', en:'★ AI: joker → Build {0} ✅', pt:'★ IA: coringa → Construção {0} ✅' },
+    aiJokerDirect:{ de:'★ KI: Joker direkt → 🏗️ Bau {0}', en:'★ AI: joker directly → 🏗️ Build {0}', pt:'★ IA: coringa diretamente → 🏗️ Construção {0}' },
+    aiJokerSafe:  { de:'★ KI: Joker sicher → 🗑️ Ablage {0}', en:'★ AI: securing joker → 🗑️ Discard {0}', pt:'★ IA: coringa em segurança → 🗑️ Descarte {0}' },
+    aiJokerSecured:{ de:'★ KI: Joker gesichert auf Ablage {0}', en:'★ AI: joker secured on discard {0}', pt:'★ IA: coringa guardado no descarte {0}' },
+    aiPickDiscard:{ de:'🤖 KI wählt Karte {0} zum Ablegen', en:'🤖 AI picks card {0} to discard', pt:'🤖 A IA escolhe a carta {0} para descartar' },
+    aiDiscard:    { de:'🤖 KI legt {0} → 🗑️ Ablage {1}', en:'🤖 AI plays {0} → 🗑️ Discard {1}', pt:'🤖 A IA joga {0} → 🗑️ Descarte {1}' },
+    aiDiscarding: { de:'🤖 KI legt Karte auf Ablagestapel...', en:'🤖 AI is placing a card on a discard pile...', pt:'🤖 A IA coloca uma carta num descarte...' },
+    aiRedraw:     { de:'🃏 KI hat alle Handkarten gespielt – zieht 5 neue!', en:'🃏 AI played all hand cards – drawing 5 new ones!', pt:'🃏 A IA jogou todas as cartas da mão – compra 5 novas!' },
+    aiDraw:       { de:'🃏 KI zieht Karten nach...', en:'🃏 AI is drawing cards...', pt:'🃏 A IA compra cartas...' },
+    aiNoHand:     { de:'ℹ️ KI hat keine Handkarten mehr – kein Pflichtablegen', en:'ℹ️ AI has no hand cards left – no mandatory discard', pt:'ℹ️ A IA não tem cartas na mão – sem descarte obrigatório' },
+    aiNoHandToDiscard:{ de:'⚠️ Keine Handkarten zum Ablegen', en:'⚠️ No hand cards to discard', pt:'⚠️ Sem cartas na mão para descartar' },
+    aiDiscardFailed:{ de:'⚠️ Ablage fehlgeschlagen!', en:'⚠️ Discard failed!', pt:'⚠️ Falha no descarte!' },
+    aiEnd:        { de:'✅ KI beendet Zug – Spielerwechsel', en:'✅ AI ends its turn – switching players', pt:'✅ A IA termina a jogada – troca de jogador' },
+
+    // ── Spielregeln (Einstellungen-Fenster) ──
+    rulesHtml: {
+de: `
+    <h2>Spielregeln und Benutzerinformationen</h2>
+
+    <p><strong>1. Ziel des Spiels:</strong><br>
+    - Das Hauptziel ist es, alle Karten aus deinem Stockstapel abzulegen, um das Spiel zu gewinnen.<br>
+    - Du kannst Karten auf die Baukartenstapel in aufsteigender Reihenfolge von 1 bis 12 ablegen.<br>
+    - Joker können jede Karte ersetzen und haben keinen festen Wert.</p>
+
+    <p><strong>2. Kartentypen:</strong><br>
+    - Zahlenkarten: Karten mit Werten von 1 bis 12.<br>
+    - Joker (★): Kann jede Karte ersetzen und wird flexibel verwendet.</p>
+
+    <p><strong>3. Kartenmengen:</strong><br>
+    - 144 Zahlenkarten (12 Sätze × 12 Karten) + 12 Joker = 156 Karten gesamt.</p>
+
+    <p><strong>4. Spielstart:</strong><br>
+    - Jeder Spieler erhält 5 Handkarten und 20 Stockkarten.<br>
+    - Die restlichen Karten bilden den Nachziehstapel.</p>
+
+    <p><strong>5. Spielverlauf:</strong><br>
+    - Spieler legen abwechselnd Karten auf Baustapel oder Ablagestapel.<br>
+    - Baustapel: aufsteigende Reihenfolge 1–12. Joker ersetzt jeden Wert.<br>
+    - Vollständiger Baustapel (1–12) wird geleert und gemischt.<br>
+    - Nachziehen bis 5 Handkarten vorhanden.<br>
+    - Kein legaler Zug möglich → Karte auf Ablagestapel legen (Pflichtzug).<br>
+    - Langes Drücken auf Ablagestapel: Karteninhalt anzeigen.</p>
+
+    <p><strong>6. Spieleraktionen:</strong><br>
+    - Karte antippen = Karte auswählen (leuchtet auf).<br>
+    - Nochmals antippen = Auswahl aufheben.<br>
+    - Zielstapel antippen = Karte dorthin legen.<br>
+    - Infoleiste verschieben für optimale Sicht.</p>
+
+    <p><strong>7. Spielgeschwindigkeit:</strong><br>
+    - Schieberegler: 0s (sehr schnell) bis 20s (sehr langsam).<br>
+    - Standard: 4s. Für KI-Analyse empfehlen sich 6–10s.</p>
+
+    <p><strong>8. Spielende:</strong><br>
+    - Wer zuerst seinen Stock leer hat, gewinnt.<br>
+    - Verlierer erhält 5 Punkte pro verbleibender Stockkarte.</p>
+
+    <p><strong>9. Hinweise:</strong><br>
+    - ⚙️-Menü → Spielregeln: Dieses Fenster erneut öffnen.<br>
+    - Infoleiste nach unten schieben für mehr Platz.</p>
+  `,
+en: `
+    <h2>Game Rules and User Information</h2>
+
+    <p><strong>1. Goal of the game:</strong><br>
+    - The main goal is to play all cards from your stock pile to win the game.<br>
+    - You can play cards onto the build piles in ascending order from 1 to 12.<br>
+    - Jokers can replace any card and have no fixed value.</p>
+
+    <p><strong>2. Card types:</strong><br>
+    - Number cards: cards with values from 1 to 12.<br>
+    - Joker (★): can replace any card and is used flexibly.</p>
+
+    <p><strong>3. Card counts:</strong><br>
+    - 144 number cards (12 sets × 12 cards) + 12 jokers = 156 cards in total.</p>
+
+    <p><strong>4. Game start:</strong><br>
+    - Each player receives 5 hand cards and 20 stock cards.<br>
+    - The remaining cards form the draw pile.</p>
+
+    <p><strong>5. Gameplay:</strong><br>
+    - Players take turns playing cards onto build piles or discard piles.<br>
+    - Build piles: ascending order 1–12. A joker replaces any value.<br>
+    - A completed build pile (1–12) is cleared and shuffled back in.<br>
+    - Draw back up to 5 hand cards.<br>
+    - No legal move possible → place a card on a discard pile (mandatory).<br>
+    - Long press on a discard pile: show its contents.</p>
+
+    <p><strong>6. Player actions:</strong><br>
+    - Tap a card = select it (it lights up).<br>
+    - Tap again = deselect.<br>
+    - Tap a target pile = play the card there.<br>
+    - Move the info bar for the best view.</p>
+
+    <p><strong>7. Game speed:</strong><br>
+    - Slider: 0s (very fast) to 20s (very slow).<br>
+    - Default: 4s. For AI analysis, 6–10s is recommended.</p>
+
+    <p><strong>8. End of game:</strong><br>
+    - Whoever empties their stock first wins.<br>
+    - The loser scores 5 points per remaining stock card.</p>
+
+    <p><strong>9. Notes:</strong><br>
+    - ⚙️ menu → Game rules: reopen this window.<br>
+    - Slide the info bar down for more space.</p>
+  `,
+pt: `
+    <h2>Regras do Jogo e Informações</h2>
+
+    <p><strong>1. Objetivo do jogo:</strong><br>
+    - O objetivo principal é jogar todas as cartas da tua pilha de reserva para vencer.<br>
+    - Podes jogar cartas nas pilhas de construção em ordem crescente, de 1 a 12.<br>
+    - Os coringas substituem qualquer carta e não têm valor fixo.</p>
+
+    <p><strong>2. Tipos de cartas:</strong><br>
+    - Cartas numéricas: valores de 1 a 12.<br>
+    - Coringa (★): substitui qualquer carta, de forma flexível.</p>
+
+    <p><strong>3. Quantidade de cartas:</strong><br>
+    - 144 cartas numéricas (12 conjuntos × 12 cartas) + 12 coringas = 156 cartas no total.</p>
+
+    <p><strong>4. Início do jogo:</strong><br>
+    - Cada jogador recebe 5 cartas na mão e 20 cartas de reserva.<br>
+    - As restantes formam a pilha de compra.</p>
+
+    <p><strong>5. Decurso do jogo:</strong><br>
+    - Os jogadores jogam alternadamente nas construções ou nos descartes.<br>
+    - Construções: ordem crescente 1–12. O coringa substitui qualquer valor.<br>
+    - Uma construção completa (1–12) é esvaziada e baralhada de volta.<br>
+    - Compra-se até ter 5 cartas na mão.<br>
+    - Sem jogada legal → colocar uma carta num descarte (obrigatório).<br>
+    - Toque longo num descarte: mostrar o conteúdo.</p>
+
+    <p><strong>6. Ações do jogador:</strong><br>
+    - Tocar numa carta = selecionar (acende).<br>
+    - Tocar de novo = cancelar a seleção.<br>
+    - Tocar na pilha de destino = jogar a carta.<br>
+    - Move a barra de informação para melhor visão.</p>
+
+    <p><strong>7. Velocidade do jogo:</strong><br>
+    - Controlo: 0s (muito rápido) a 20s (muito lento).<br>
+    - Padrão: 4s. Para análise da IA recomenda-se 6–10s.</p>
+
+    <p><strong>8. Fim do jogo:</strong><br>
+    - Vence quem esvaziar primeiro a sua reserva.<br>
+    - O perdedor recebe 5 pontos por carta de reserva restante.</p>
+
+    <p><strong>9. Dicas:</strong><br>
+    - Menu ⚙️ → Regras do jogo: reabrir esta janela.<br>
+    - Desliza a barra de informação para baixo para mais espaço.</p>
+  `
+    }
+  }
+};

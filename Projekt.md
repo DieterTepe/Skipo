@@ -1,292 +1,228 @@
-# Projekt Skip-Bo Mobile – Projektstand & Ziele
+# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.1
 
 > **Zweck dieser Datei:** Übergabe-Dokument. Wer einen neuen Chat startet, liest
-> zuerst diese Datei und weiß sofort, was Stand, Entscheidungen und nächste
-> Schritte sind. Bei jeder größeren Änderung aktualisieren.
+> zuerst diese Datei und weiß sofort, was Stand, Regeln, Entscheidungen und
+> nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
-**Letzte Aktualisierung:** 16.06.2026 — Schritt 1 (CSS-Auslagerung) abgeschlossen und live getestet.
-
----
-
-## 1. Was ist das Projekt?
-
-Eine vollständige **Skip-Bo-Implementierung** (Mensch gegen KI) als Browser-Spiel,
-mobil-optimiert (9:16, Touch), viersprachig (DE / EN / PT / UK).
-
-- **Referenz-Version 6.6.0** – `SkipBo_6_6_0.html`, ~6175 Zeilen, alles in EINER
-  Datei. Gilt als **optimal in Ablauf und Funktion**. Bleibt als stabile
-  Referenz unangetastet.
-- **Aktive Version 7.0.0** – Struktur-Umbau **ABGESCHLOSSEN**: die Einzeldatei
-  wurde in mehrere Dateien aufgeteilt (1 HTML + 1 CSS + 7 JS). Verhalten,
-  Aussehen und Regeln 1:1 wie 6.6.0.
-- **Läuft live (funktionierender Link):**
-  https://dietertepe.github.io/Skipo/SkipBo_7_0_0.html
-- **Repo:** `DieterTepe/Skipo` (GitHub Pages).
-
-**Grundregel bei allen Umbauten:** Verhalten/Aussehen/Regeln 1:1 erhalten,
-solange nicht ausdrücklich eine Änderung gewünscht ist. Immer auf gute
-**Erweiterbarkeit** achten (Hauptwunsch des Nutzers).
+**Letzte Aktualisierung:** 04.09.2026 — **7.0.1 fertig gebaut und in der Sandbox
+geprüft** (Node-Simulation, Äquivalenz gegen 7.0.0, Browser-Test mit Chrome).
+Offen: Live-Test durch Dieter auf GitHub Pages.
 
 ---
 
-## 2. Wichtige Projekt-Regeln (Infrastruktur)
+## 0. Kurzfassung für den schnellen Einstieg
 
-1. **Alles FLACH im Ordner `Skipo` – KEINE Unterordner.**
-2. **ALLE `<link>`/`<script>`-Pfade als VOLLE absolute URL mit Cache-Buster**
-   (Wunsch des Nutzers, ermöglicht Arbeiten/Testen vom Handy):
-   `https://dietertepe.github.io/Skipo/DATEINAME?v=2`
-   Beispiel: `<link rel="stylesheet" href="https://dietertepe.github.io/Skipo/style.css?v=2">`,
-   `<script src="https://dietertepe.github.io/Skipo/konfig.js?v=2"></script>`.
-   - **Cache-Hinweis:** Bei jeder Änderung an einer Datei die `?v=`-Zahl erhöhen
-     (z. B. `?v=3`), damit der Browser frisch lädt – besonders wichtig bei
-     `konfig.js`, das beim Tunen oft geändert wird.
-   - **Tradeoff (bewusst akzeptiert):** Absolute URLs sind an `dietertepe/Skipo`
-     gebunden. Bei Umzug/Umbenennung alle URLs anpassen (Suchen-Ersetzen).
-2. **Klassische `<script src>`-Dateien**, KEINE ES-Module (`import`/`export`),
-   KEIN Bundler. Grund: gemeinsamer globaler Namensraum (`Game`, `KONFIG`, freie
-   Funktionen rufen sich gegenseitig). Klassische Scripts behalten dieses
-   Verhalten – fast keine Code-Änderung nötig. Passt zu GitHub Pages
-   (editieren → pushen, kein Build-Schritt).
-3. **Alles beim Start laden, nichts „on demand".** Aufteilen ja, bedarfsweises
-   Nachladen nein.
-4. **Hauptdatei heißt `SkipBo_7_0_0.html`** (Unterstriche, kein `index.html`).
-5. **Beim Auslagern NICHTS inhaltlich ändern, nur verschieben** – so bleibt jeder
-   Fehler sofort lokalisierbar. (Geprüft: JS-Block ist Byte-identisch zu 6.6.0.)
+- **7.0.1** ist ein **kompletter Neuaufbau** mit vier Schichten, einem Namensraum je
+  Datei, Ereignisbus, Meldungsschlüsseln (DE/EN/PT) und einem Speicher-Zugang.
+  Regeln, Aussehen und KI-Stärke sind 1:1 wie 6.6.0/7.0.0 – **bewiesen**: 500
+  simulierte Spiele mit gleichem Seed liefern Zug für Zug dieselben Züge wie 7.0.0.
+- **7.0.0** (`SkipBo_7_0_0.html` + state/engine/view/ai/endgame.js) und **6.6.0**
+  bleiben unangetastet im Repo als Referenz. `test-sim.js` braucht die 7.0.0-JS-Dateien
+  für den Vergleich – **nicht löschen**.
+- Hauptdatei: `SkipBo_7_0_1.html`. Alle Dateien flach im Ordner `Skipo`,
+  absolute URLs mit `?v=7.0.1`.
+- Ukrainisch ist entfallen (Entscheidung 04.09.2026). Drei Sprachen: DE, EN, PT.
+- Neues Spiel = Seitenreload (wie 7.0.0); `Flow.startGame()` kann aber auch in-page.
 
 ---
 
-## 3. Aufbau des Codes (17 Module)
-
-Engine-Funktionen fassen nie das DOM an, Rendering liest nur. KI und Mensch
-nutzen dieselben Engine-Funktionen.
-
-| Modul | Inhalt | Ziel-Datei (geplant) |
-|-------|--------|----------------------|
-| 01 | `KONFIG` – Tuner-Schnittstelle, alle `SCORE_*` (1:1 austauschbar) | `konfig.js` |
-| 02 | `KI_PLANNER` – Config des Zugketten-Planers (außerhalb von KONFIG!) | `ki-planner.js` |
-| 03 | Globaler Spielzustand (`Game`, Globals) | `state.js` |
-| 04 | Hilfsfunktionen | `state.js` |
-| 05 | Spielinitialisierung (Deck, Verteilen, Tracking) | `engine.js` |
-| 06 | Spielregeln & Zug-Engine | `engine.js` |
-| 07 | Rendering & View (`updateView`) | `view.js` |
-| 08 | Overlay & Einstellungen | `view.js` |
-| 09 | Spieler-Eingabe (Touch/Klick) | `view.js` |
-| 10 | KI-Steuerung (Rundenablauf `aiTurn_*`) | `ai.js` |
-| 11 | KI-Zugketten-Planer (Herzstück, Tiefensuche) | `ai.js` |
-| 12 | KI-Bewertung & Scoring (getunte Heuristik) | `ai.js` |
-| 13 | KI-Analyse & Gegner-Vorhersage | `ai.js` |
-| 14 | Joker-Strategie, Hand-Ketten, Tiefenanalyse | `ai.js` |
-| 15 | Spielende, Tracking & Tuner-Auswertung | `endgame.js` |
-| 16 | Info-Fenster, Schnellmenü & Initialisierung | `endgame.js` |
-| 17 | 🌐 Sprachmodul | `endgame.js` |
-
-**Drei Stellen für Änderungen besonders beachten:**
-- Modul 01 `KONFIG` – wird vom Tuner erzeugt, NUR dieser Block wird ersetzt.
-- Modul 02 `KI_PLANNER` – darf beim Tuner-Tausch NICHT überschrieben werden.
-- Modul 03 `Game` – gesamter veränderlicher Zustand an einem Ort.
-
-**Heikle, bereits reparierte Stellen (nicht erneut kaputt machen!):**
-- „Geister-KI": parallele `aiTurn`-Stränge → abgesichert durch `aiTurnActive`,
-  `restarted`-Flag, awaited Rekursion.
-- `clearAiPredictionMarkers` darf nur die CSS-Klasse entfernen, nicht das DIV.
-- Tote `DEBUG_*`-Zweige wurden entfernt – nicht wieder einführen.
-
-**Keine externen Assets:** Das Original hat KEINE Bilder/Schriften/Links.
-Kartenfarben sind reine CSS-Verläufe, „SKIP-BO" auf der Rückseite ist
-CSS `::before`. Eine korrekt geladene `style.css` stellt das volle Aussehen her.
-
----
-
-## 4. Dateistruktur (Soll-Zustand)
+## 1. Dateisatz 7.0.1 (Ladereihenfolge = Abhängigkeit)
 
 ```
-Skipo/                  (Repo-Wurzel, GitHub Pages)
-├── SkipBo_7_0_0.html   Hauptdatei: DOM-Gerüst + <link>/<script>-Tags
-├── style.css           gesamtes CSS                          [ERLEDIGT]
-├── konfig.js           Modul 01 (DIE Datei zum Tunen)         [ERLEDIGT]
-├── ki-planner.js       Modul 02 (Planer-Konfig)               [ERLEDIGT]
-├── state.js            Modul 03 + 04 (Zustand + Helfer)        [ERLEDIGT]
-├── engine.js           Modul 05 + 06 (Init, Regeln)            [ERLEDIGT]
-├── view.js             Modul 07 + 08 + 09 (UI/Eingabe)         [ERLEDIGT]
-├── ai.js               Modul 10–14 (komplette KI)              [ERLEDIGT]
-├── endgame.js          Modul 15 + 16 + 17 (Ende/Init/Sprache)  [ERLEDIGT]
-├── Projekt.md          diese Datei
-└── SkipBo_6_6_0.html   Referenz (unverändert aufbewahren)
+Skipo/  (Repo-Wurzel, GitHub Pages, flach)
+│
+│  ── Konfiguration (Tuner-Schnittstelle, unverändert übernommen) ──
+├── konfig.js            let KONFIG      Tuner-Werte SCORE_* – NUR dieser Block wird vom Tuner ersetzt
+├── ki-planner.js        const KI_PLANNER Planer-Konfiguration
+│
+│  ── core: Fundament, KEIN DOM, läuft in Node ──
+├── core-events.js       Events    on / off / emit – Ereignisbus
+├── core-store.js        Store     get / set / remove / migrate – EIN Zugang zu localStorage
+├── core-settings.js     Settings  name · lang · speed · bg · nameSet · THEMES, load / set
+│                        Clock     pause(mult) / after(ms, fn)
+├── core-i18n.js         I18n      t(key, …) / say(key, …) / setLang, Wörterbuch T (DE/EN/PT)
+├── core-state.js        State     game · turn · reset() · player(p) · opponent(p)
+├── core-rules.js        Rules     Deck, shuffle (Rules.random), deal, newGame, isValidBuild,
+│                                  isPileComplete, clearPile, hasAnyBuildMove, playToBuild,
+│                                  playToDiscard, drawToFive, winner, winnerByStock
+│
+│  ── ai: KI, KEIN DOM ──
+├── ai-turn.js           AI        takeTurn · prepare · executeMoves · finish · stockAttack · discard
+│                                  + over() / say() / note() / cardLabel / srcLabel / reasonText
+├── ai-planner.js        AI.Planner  snapshot · hash · moves · apply · search · riskCheck · runChains · executeChain
+├── ai-eval.js           AI.Eval     candidates · scoreHand · jokerOnBuild · scoreStock · scoreDiscard · dedup · filter
+│                                    · jokerFutureValue · gapSize · futureRisk · dynamicPriorities · blockingPotential
+│                                    · canRemoveStockCard · neededForStock · opponentCritical
+├── ai-analysis.js       AI.Analysis predictEnemyStock · consecutiveDiscards · discardPatterns · blockScore
+│                                    · jokerStockTop · jokerHand · jokerProtectDiscard · jokerCombo · jokerBestDiscard
+│                                    · jokerFollowUps · handCombo · handComboCache · discardLookAhead
+│                                    · discardComboDepth · discardSimChain
+│
+│  ── flow + tracking, KEIN DOM ──
+├── core-flow.js         Flow      startGame · idle · checkEnd · humanCanAct · humanBuild · humanDiscard · _aiRound
+├── tracking.js          Tracking  stats · init · load · save · reset · observe · gameEnd
+│
+│  ── ui: Oberfläche (liest State, hört Events, ruft Flow/Settings) ──
+├── ui-render.js         Render    init · all · hand · stock · drawPile · buildPiles · discardPiles · borders
+│                                  · labels · message · predictionMarkers · background · enable
+│                                  · cardFaceHTML · cardBackHTML
+├── ui-input.js          Input     init · onClick · toggleSelect · placeOnBuild · tapOwnDiscard · highlight · clear
+│                                  · enableDraggableLabel (Long-Press → Overlays.infoWindow)
+├── ui-menu.js           Menu      init · toggle · close · texts · actions{settings, design, rules, lang,
+│                                  newgame, tuner-reset, imprint, privacy, close}
+├── ui-overlays.js       Overlays  init · texts · showSettings · hideSettings · showDesign · syncDesign
+│                                  · showLanguage · showEnd · tunerAnalysisHTML · infoWindow
+├── app.js               App       init (Reihenfolge: Settings → I18n → Tracking → Render/Input/Menu/Overlays → Flow)
+│
+│  ── Werkzeug ──
+├── test-sim.js          Prüfstand (nur Node; nicht im HTML geladen), siehe Abschnitt 5
+│
+├── SkipBo_7_0_1.html    DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
+├── style.css            CSS 7.0.0 unverändert + neuer Block am Ende (Menü, Statuszeile, Stock-Rahmen,
+│                        Einstellungen, Endscreen, Sprachwahl – vorher Inline/JS-injiziert)
+├── impressum.html / datenschutz.html   „Zurück"-Link auf SkipBo_7_0_1.html
+├── Projekt.md           diese Datei
+├── SkipBo_7_0_0.html + state.js engine.js view.js ai.js endgame.js   Referenz 7.0.0 (für test-sim.js nötig)
+└── SkipBo_6_6_0.html    Ur-Referenz
 ```
 
-**Script-Reihenfolge** (wenn JS ausgelagert wird) = Abhängigkeitsreihenfolge:
-zuerst `konfig.js`, `ki-planner.js`, `state.js`, dann `engine.js`, `view.js`,
-`ai.js`, `endgame.js`. Unkritisch, da fast alles in Funktionskörpern steckt; nur
-die obersten `let KONFIG` / `const Game` müssen vor allem anderen geladen sein.
+---
+
+## 2. Die sechs Architekturregeln
+
+1. **Nur nach unten rufen.** core kennt weder ai noch ui. ai kennt core. flow kennt
+   core + ai. ui liest State/Tracking und ruft Flow/Settings/I18n. Nichts ruft nach oben.
+2. **Nach oben nur per Ereignis** (`Events.emit`). Die UI hört zu. Liste der Ereignisse
+   steht im Kopf von `core-events.js`.
+3. **core / ai / flow / tracking fassen nie das DOM an.** Kein `document`, `window`,
+   `localStorage` (außer in `Store`). `test-sim.js` lädt sie in Node ohne DOM – jeder
+   Verstoß fliegt sofort auf.
+4. **Meldungen sind Schlüssel.** `I18n.say('aiBuild', karte, quelle, 2, 1500)` statt
+   deutscher Satz. Neue Meldung = ein Eintrag in `core-i18n.js` mit de/en/pt.
+5. **Ein Store, ein Präfix.** Alle Werte unter `skipo.v1.*` (name, lang, speed, bg,
+   nameSet, tuner). Alte `skipbo-*`-Schlüssel werden beim ersten Start einmalig
+   übernommen und gelöscht.
+6. **Ein Render-Einstieg.** `Render.all()` nach jeder Zustandsänderung (ausgelöst durch
+   Ereignisse). Danach Ereignis `render` (Input wendet die Auswahl-Markierung neu an).
 
 ---
 
-## 5. Fortschritt
+## 3. Erweiterungs-Rezepte (so bleibt es sauber)
 
-1. [x] **CSS → `style.css`** — ERLEDIGT & live getestet 16.06.2026.
-       `SkipBo_7_0_0.html` lädt CSS per `<link rel="stylesheet" href="style.css">`.
-       JS-Block verifiziert Byte-identisch zu 6.6.0. Sichtbare Versionsangaben
-       auf v7.0.0 gehoben (Titel + Schnellmenü).
-2. [x] **`konfig.js`** (Modul 01) — ERLEDIGT 16.06.2026.
-       Der `let KONFIG = {...};` Block liegt jetzt in `konfig.js` und wird per
-       `<script src=...konfig.js?v=2>` VOR dem Haupt-Script geladen. Funktioniert,
-       weil top-level `let` in klassischen Scripts im gemeinsamen globalen
-       Lexical-Scope liegt → `KONFIG` ist im Haupt-Script sichtbar (dort 116×
-       genutzt). Verifiziert: genau 1 Deklaration, beide JS-Teile syntaxgeprüft
-       (node --check). **Dies ist die Datei zum Tunen/Anpassen.**
-3. [x] **`ki-planner.js`** (Modul 02) — ERLEDIGT 16.06.2026.
-       `const KI_PLANNER = {...};` ausgelagert, per `<script src=...ki-planner.js?v=2>`
-       vor dem Haupt-Script geladen (global verfügbar, im Inline 15× genutzt).
-       Verifiziert: 1 Deklaration, syntaxgeprüft. KONFIG unverändert korrekt.
-4. [x] **`state.js`** (Modul 03 + 04) — ERLEDIGT 16.06.2026.
-       Globaler Zustand (`Game`, `currentPlayer`, `spielGeschwindigkeit`,
-       `tunerTracking` u.a.) + Hilfsfunktionen (`pileTopValue`, `cardNumericValue`,
-       `getJokerValue`, `pauseForSeconds`, ...) ausgelagert. Nur Deklarationen/
-       Funktionen, nichts läuft beim Laden. Per `<script src=...state.js?v=2>` vor
-       dem Haupt-Script geladen. Verifiziert: keine Doppel-Deklaration (Globals
-       0×, `topCard`/`previousCard` sind funktionslokal), beide Teile node --check OK.
-5. [x] **`engine.js`** (Modul 05 + 06) — ERLEDIGT 16.06.2026.
-       Spielinitialisierung (`initGame`, `buildDeck`, `dealCards`, `initTracking`,
-       `resetGameState` ...) + Regeln/Zug-Engine (`isValidBuildMove`,
-       `handleBuildPileDrop`, `handleDiscardPileDrop`, `clearBuildPile` ...).
-       16 Funktionen, nur Deklarationen (nichts läuft beim Laden). Vor dem
-       Haupt-Script geladen. Verifiziert: keine doppelte Funktion, beide Teile
-       node --check OK. Hinweis: engine.js ruft zur Laufzeit auch Inline-Funktionen
-       (`updateView`, `showMessage`) – unkritisch, da erst bei Aufruf aufgelöst.
-6. [x] **`view.js`** (Modul 07 + 08 + 09) — ERLEDIGT 16.06.2026.
-       Rendering (`updateView`, `showMessage` ...), Overlay/Einstellungen,
-       Spieler-Eingabe/Touch. 20 Funktionen. Enthält EINEN Top-Level-Aufruf
-       `addStockHighlightStyles()` (injiziert nur CSS in den `<head>`, idempotent,
-       self-contained) – Definition + Aufruf zusammen ausgelagert, läuft beim
-       Laden von view.js problemlos. Verifiziert: keine Doppel-Deklaration,
-       node --check OK.
-7. [x] **`ai.js`** (Modul 10–14) — ERLEDIGT 16.06.2026.
-       Komplette KI: Steuerung (`aiTurn`), Zugketten-Planer (Modul 11), Scoring
-       (Modul 12, nutzt KONFIG), Analyse (13), Joker-Strategie (14). 50 Funktionen
-       + der Wächter `let aiTurnActive` (Schutz vor Geister-KI), genau 1× deklariert.
-       Größter Block (~2550 Zeilen). Verifiziert: keine Doppel-Deklaration,
-       node --check OK auf beiden Seiten.
-8. [x] **`endgame.js`** (Modul 15 + 16 + 17) — ERLEDIGT 16.06.2026.
-       Spielende/Tracking, Info/Schnellmenü/**Initialisierung**, Sprachmodul.
-       Lädt als LETZTES externes Script (nach ai.js). Spielstart via
-       `DOMContentLoaded → initGame()`; `initGame` ist in engine.js (vorher
-       geladen) → verfügbar. Top-Level-Code (Event-Listener, `.discard-field`-
-       Handler, Sprach-Tabellen) läuft am Body-Ende, DOM existiert bereits.
-       Verifiziert: node --check OK, keine Doppel-Deklaration.
-
-═══════════════════════════════════════════════════════════════════
-✅ **REFAKTORIERUNG ABGESCHLOSSEN (16.06.2026)** — alle 17 Module ausgelagert.
-   HTML von ~6175 auf ~285 Zeilen (nur noch DOM-Gerüst + Lade-Tags).
-   Vollständigkeitsbeweis gegen 6.6.0: 121 Funktionen + 21 Globals = exakt
-   identisch verteilt, nichts fehlt/doppelt. Alle 8 Dateien node --check OK.
-   Live getestet: läuft fehlerfrei.
-
-   **ÄQUIVALENZ-BEWEIS gegen 6.6.0 (16.06.2026, sehr gründlich):**
-   - JS-Code (Kommentare/Leerzeilen ignoriert): 3408 Zeilen ZEICHENGENAU
-     identisch zwischen Original und den 8 Dateien.
-   - CSS-Inhalt: 394 Zeilen zeichengenau identisch (nur Einrückung entfernt).
-   - Body-DOM identisch (nur Versionslabel v6.6.0→v7.0.0). Head identisch
-     (nur Titel-Version + CSS-Verweis).
-   - 121 Funktionen + 21 Globals: exakt identisch verteilt, nichts fehlt/doppelt.
-   - Keine Cross-File-Doppeldeklaration; kein `window.`/`globalThis.`-Zugriff auf
-     `let`/`const`-Globals (Scoping sicher); alle 7 JS node --check OK.
-   FAZIT: Funktional beweisbar IDENTISCH mit 6.6.0. Kein Bug eingeschleppt.
-═══════════════════════════════════════════════════════════════════
-
-Pro JS-Schritt: Block aus HTML schneiden → eigene Datei → `<script src>` am
-Dateiende (Reihenfolge s. o.) → live testen → Projekt.md abhaken.
+| Vorhaben | Wo |
+|---|---|
+| Neue Statusmeldung | `core-i18n.js` Eintrag (de/en/pt) → irgendwo `I18n.say('key', …)` |
+| Neuer Menüpunkt | Button mit `data-action="x"` in HTML → `Menu.actions.x()` in `ui-menu.js` → Text `qmX` in I18n + `Menu.texts()`-Zuordnung |
+| Neue Einstellung (persistent) | `Settings.DEFAULTS` ergänzen → `Settings.set('key', wert)` → Hörer auf `settings:change` |
+| Regeländerung | ausschließlich `core-rules.js`; danach `node test-sim.js --new-only` (Invarianten) |
+| KI-Verhalten | `ai-*.js`; danach `node test-sim.js` – erwartete Abweichung vom 7.0.0-Vergleich dann dokumentieren |
+| Neues Overlay | `ui-overlays.js` Methode + CSS-Klassen in `style.css` (keine Inline-Styles) |
+| Sound / Statistik / Schwierigkeitsgrad | neue Datei, hört auf `move:*`, `game:over`, `turn:change`; wird in `app.js` initialisiert |
+| Release | alle `?v=7.0.1` in `SkipBo_7_0_1.html` gemeinsam hochzählen |
 
 ---
 
-## 6. Erkenntnisse / Stolperfallen (real aufgetreten)
+## 4. Bewusste Abweichungen zu 7.0.0 (alle geprüft)
 
-- **GitHub-Upload am Handy:** Der Fehler „Etwas ist gewaltig schiefgelaufen, und
-  wir können diese Datei nicht verarbeiten" ist ein bekannter GitHub-Glitch,
-  KEIN Datei-Problem (trifft sogar 1-KB-Dateien). Lösung: vom **Laptop** hochladen
-  oder im Web-Editor **„Add file → Create new file"** + Inhalt einfügen (umgeht
-  den Upload). Half hier: Upload vom Laptop.
-- **Seite erschien unstyled (Karten als nackter Text):** Ursache war, dass die
-  CSS nicht geladen wurde (falscher Pfad/Upload-Mix). **Diagnose:** im Browser
-  direkt `…/Skipo/style.css` öffnen — zeigt CSS-Text = Datei ok; 404 = Name/Ort
-  falsch. **Pflicht:** Dateiname exakt `style.css` (Groß/klein!), flach neben der
-  HTML, `<link>` ohne `css/`-Präfix. Nach Fix **hart neu laden** (Cache).
-- **Cache:** Browser/GitHub Pages cachen hartnäckig. Nach Updates hart neu laden
-  (Strg+F5 / Cmd+Shift+R); zur Not `style.css?v=7.0.1` als Versions-Query.
+**Spielverhalten (keine Änderung der KI-Stärke):**
+- Die KI hört **sofort** auf, wenn ein Stock leer ist. 7.0.0 spielte nach einem
+  Siegzug über die Stock-Priorität oder den Stock-Fallback noch weiter, bis die nächste
+  Siegprüfung kam (Punkte/Sieger waren davon nie betroffen). `test-sim.js` schneidet die
+  7.0.0-Zugfolge deshalb nach dem Siegzug ab; bis dahin sind alle Züge identisch.
+- Legt der Mensch seine letzte Handkarte, zieht nur er nach. 7.0.0 ließ an dieser
+  Stelle auch die KI nachziehen (praktisch immer wirkungslos, da ihre Hand voll war).
+- **Auto-Pass:** Hat der Mensch keine Handkarte (Nachziehstapel leer) und keinen
+  Bauzug, geht der Zug automatisch an die KI (7.0.0: Spiel hing). Passen beide dreimal
+  hintereinander → Notwertung `Rules.winnerByStock()` (kleinerer Stock gewinnt).
+- Nur Karten im eigenen Bereich sind wählbar (7.0.0 ließ KI-Handkarten „wählen" und
+  spielte dann die eigene Karte am selben Index).
+- Spielername wird gespeichert und beim Start wiederhergestellt.
+
+**Tuner-Tracking:**
+- Jeder KI-Zug wird **einmal** gezählt. 7.0.0 zählte live und beim Spielende noch einmal
+  (doppelt). Die Schwellen der Auswertung sind unverändert – die Werte sind jetzt korrekt,
+  d. h. etwa halb so groß wie bisher angezeigt. Beim Tunen berücksichtigen.
+- Die Einzelbeobachtungen (`skipbo_observations`) werden nicht mehr gespeichert; nur die
+  Statistik (`skipo.v1.tuner`). Die beiden Analyse-Texte, die daraus erzeugt wurden,
+  hat 7.0.0 nie angezeigt.
+
+**Entfernt (tot oder wirkungslos):** `Joker_auf_Ablage`-Flag, `evaluateAndSelectMove`,
+`delayWithCallback`, `GESCHWINDIGKEIT`, `getDiscardSequenceBonus`, `deckComposition`,
+`stockPredictions`, Zeitstempel in der Ablage-Historie, `faceUp`-Attribut, der
+Regex-Übersetzer (`PHRASE_RULES`/`MSG_RULES`/`DUKI`), CSS-Injektion per JS.
+
+**Texte:** Regeltext korrigiert („Langes Drücken" statt „Kurzes Drücken";
+„⚙️-Menü → Spielregeln" statt „5 Sekunden drücken"). Blockade-Tag, „Leer" und die
+Joker-Begründungen sind jetzt in allen drei Sprachen (waren deutsch).
 
 ---
 
-## 7. SPÄTERE ZIELE / Ideen
+## 5. Prüfstand – nach jeder Änderung laufen lassen
 
-### Testphase-Korrekturen (17.06.2026)
-- [x] **Ablagestapel-Klick** (view.js, `handleCardSelect`): Klick auf eine bereits
-      liegende Karte im EIGENEN Ablagestapel wählte fälschlich diese Karte aus,
-      statt die gewählte Handkarte abzulegen (nur der leere Feldbereich funktionierte).
-      Fix: analog zum Baustapel ein Fall ergänzt – ist eine Karte gewählt, wird der
-      Klick auf `.human-area .discard-field` als Ablegen behandelt; ohne Auswahl
-      bleibt das Anwählen der obersten Ablagekarte erhalten.
-- [x] **KI-Layout gespiegelt** (SkipBo_7_0_0.html): Im `.opponent-area` stand die
-      Pile-Reihe (`main-piles`: Stock + Ablagen) über der Hand. Reihenfolge getauscht
-      → `opponentHand` jetzt oben, `main-piles` darunter (korrekte Spiegelung zum
-      Spielerbereich). Reines DOM-Umsortieren, Logik unberührt.
+```
+cd Skipo
+node test-sim.js 300 42            # Simulation + Invarianten + Äquivalenz gegen 7.0.0
+node test-sim.js 100 7 --new-only  # nur neue Engine (wenn 7.0.0-Dateien fehlen)
+node test-sim.js 300 42 --old=../anderer-ordner
+```
+- Lädt core/ai/flow/tracking in Node **ohne DOM** (Regel 3 wird erzwungen).
+- Deterministischer Mensch-Bot gegen die KI, Zufall nur beim Mischen (Seed).
+- Invarianten je Zug: 156 Karten, Baustapel 1→12, Hand ≤ 5, jedes Spiel endet.
+- Äquivalenz: gleiche Spiele durch die 7.0.0-Engine (mit DOM-Attrappe), Vergleich der
+  Zugfolgen. Exit-Code 0 = alles gleich, 1 = Abweichung (mit Beispiel-Ausgabe).
 
-### Feld-Styling & Bedienung (17.06.2026)
-- [x] **3D-Bevel-Rahmen (Variante C)** statt gestrichelter Doppelrahmen (style.css):
-      Ursache des „Doppelrahmens" war, dass äußeres UND inneres `.field` den
-      gestrichelten Rand trugen. Jetzt: `.field`-Basis rahmen-/hintergrundlos;
-      Bevel nur auf den ÄUSSEREN Feldern `.discard-field/.build-pile/.draw-pile`
-      (heller oberer/linker Rand, dunkler unterer/rechter Rand, dezenter Schatten).
-- [x] **Stock**: bekommt denselben Bevel-Untergrund, behält aber den animierten
-      „leitenden Ring" (`.animated-stock-border`/`.static-stock-border`) als
-      Aktiv-Spieler-Anzeige. Menge weiterhin oben auf der Karte (`.stock-count`).
-- [x] **Feld-Beschriftungen** ausgeblendet, sobald eine Karte im Feld liegt
-      (`.discard-field:has(.card)::after`, `.build-pile:has(.card)::after`).
-      Stock & Nachziehstapel: untere Beschriftung immer aus (Menge steht oben).
-- [x] **Nachziehstapel**: Menge jetzt dezent oben auf der Rückseite als „(100)"
-      (view.js `updateDrawPile`), untere Beschriftung weg. Außerdem **nicht mehr
-      klickbar** – `handleCardSelect` ignoriert Klicks auf `.draw-pile`.
-- [x] **Ablagekarten-Abwahl** (view.js `handleCardSelect`): erneutes Antippen einer
-      bereits gewählten Ablagekarte hebt die Auswahl jetzt auf (wie bei Hand-/
-      Stockkarten). Reihenfolge der Fälle: gleiche Karte → abwählen; andere Karte
-      gewählt → ablegen; nichts gewählt → Ablagekarte als Quelle wählen.
+**Ergebnis 04.09.2026:** 300 Spiele (Seed 42) + 200 Spiele (Seed 7) → 106.250 Züge,
+**alle Zugfolgen identisch**, 0 Invarianten-Fehler. Zusätzlich statisch geprüft:
+531 Namensraum-Verweise lösen sich auf; alle 121 benutzten Sprachschlüssel existieren in
+de/en/pt; alle IDs/Klassen/data-actions vorhanden. Browser-Test (Chrome headless,
+390×844): 55 Prüfungen – Rendern, Auswahl, gültige/ungültige Züge, Stock→Ablage-Verbot,
+KI-Zug, Long-Press, Menü, Einstellungen, Sprache, Design, komplettes Spiel bis
+Endscreen, Migration alter Schlüssel, Erststart – alle bestanden, 0 Konsolenfehler.
 
+---
 
-- [x] **Kartendesign im Original-Skip-Bo-Look (CSS-Nachbau)** — ERLEDIGT & live
-      getestet. Umgesetzt in `style.css` + `view.js`:
-      - Weißer Außenrahmen, Pinwheel-Strudel (Variante A, `repeating-conic-gradient`),
-        Farbgruppen Blau 1–4 / Grün 5–8 / Rot 9–12, Joker = oranger Strudel.
-      - Gerade weiße Mittelzahl (Arial Black) + zwei Eckzahlen (oben links /
-        unten rechts gespiegelt) — `cardFaceHTML` in view.js entsprechend angepasst.
-      - Joker zeigt SKIP-BO-Logo (CSS-Text, gelb/lila) + weiterhin den Vertreterwert.
-      - Rückseite: weiße Karte, zwei grüne Balken, mittiges Logo, symmetrisch
-        (nie verkehrt herum) — neues `cardBackHTML()` in view.js.
-      - Spiellogik/`data-`-Attribute/Klassen unverändert; Drag&Drop, Zähler,
-        Joker-Wert funktionieren weiter.
-      - Verworfen: echte Fotos (Variante A der Foto-Idee) — CSS-Nachbau gewählt.
-        Vorschau-Datei `vorschau-karten.html` war nur Arbeitsmittel, kein Spielteil.
+## 6. Nächste Schritte
 
-### Noch offene/mögliche nächste Ideen
-- [x] **Impressum** — ERLEDIGT 17.06.2026. Eigene Seite `impressum.html` flach im
-      Skipo-Ordner (Kopie des dt-profidreieck.de-Impressums, Rechtstext 1:1, nur
-      Navigationslinks aufs Spiel angepasst). Im Schnellmenü als „📄 Impressum"
-      verlinkt (`menuImpressum()` in endgame.js öffnet
-      `https://dietertepe.github.io/Skipo/impressum.html` in neuem Tab; Label in
-      4 Sprachen übersetzt). Hinweis: keine Rechtsberatung.
-- [x] **Datenschutzerklärung** — ERLEDIGT 17.06.2026. Eigene Seite
-      `datenschutz.html` flach im Skipo-Ordner, an das Spiel angepasst: kostenlos,
-      keine Werbung, kein Verkauf, kein Tracking. Entfernt: Kauf/Digistore24- und
-      YouTube-Abschnitte. Ergänzt: localStorage-Hinweis (Einstellungen/Name/Sprache/
-      Statistik bleiben lokal). Im Schnellmenü als „🔒 Datenschutz" verlinkt
-      (`menuDatenschutz()` in endgame.js, Label in 4 Sprachen). Keine Rechtsberatung.
-- [x] **Hintergrundfarbe + Menü-Overlay mit Schieberegler** — ERLEDIGT 17.06.2026
-      (beide Kür-Punkte zusammen). Neues Schnellmenü „🎨 Design" öffnet ein
-      durchscheinendes Bedienfeld unten (Frosted Glass, kein Abdunkeln → Live-Sicht
-      aufs Spielfeld). 6 Themen (Grün/Blau/Türkis/Anthrazit/Bordeaux/Violett) +
-      Regler für Helligkeit & Farbton. Hintergrund = Radial-Verlauf über CSS-Variablen
-      `--bg-h/--bg-s/--bg-l` (Default = bisheriges Grün). Auswahl in localStorage
-      `skipbo-bg` (JSON {h,s,l}) gespeichert, beim Start geladen/angewandt
-      (`loadDesignSettings()` Top-Level in view.js). Logik in view.js, `menuDesign()`,
-      Overlay-CSS in style.css, Übersetzungen in endgame.js (qmDesign + design*-Keys).
-      Hinweis: Spielername wird derzeit NICHT dauerhaft gespeichert (nur „name-set"-
-      Flag) – das Design-Feature speichert dagegen korrekt persistent.
-- [ ] Optional später: echtes SKIP-BO-Logo als kleine Grafik statt CSS-Text.
-- [ ] Optional (Querformat/Desktop): zusätzlich ein Seiten-Panel statt Bottom-Sheet.
+1. **Dieter:** kompletten Dateisatz hochladen (alle 7.0.1-Dateien, `style.css` und die
+   Rechtsseiten überschreiben), dann live testen:
+   `https://dietertepe.github.io/Skipo/SkipBo_7_0_1.html` – Touch, Menüs, Sprachen,
+   Design, ein Spiel bis zum Ende. Hart neu laden (Cache).
+2. Danach Ideenpool (Abschnitt 8) – jetzt jeweils Einzeldatei-Änderungen.
+
+---
+
+## 7. Entscheidungen (fest)
+
+- Namensraum-Objekte statt freier Funktionen (04.09.2026).
+- Direkt sauber neu aufbauen, Claude testet intern, Dieter bekommt einen fertigen Satz.
+- Ukrainisch entfernt; Sprachen DE/EN/PT.
+- Online-only über GitHub Pages; Offline/PWA kein Ziel.
+- Kein echtes SKIP-BO-Logo (CSS-Text bleibt). Querformat-Seitenpanel: später.
+- 6.6.0 und 7.0.0 bleiben als Referenz im Repo (7.0.0-JS wird vom Prüfstand gebraucht).
+- KONFIG/KI_PLANNER unverändert (Tuner-Schnittstelle).
+
+---
+
+## 8. Ideenpool (Reihenfolge = Vorschlag)
+
+1. Soundeffekte (Karte legen, Stapel voll, Sieg) – hört auf `move:*`/`pile:cleared`/`game:over`, Aus-Schalter in Settings
+2. KI-Schwierigkeitsgrade (KONFIG-Sätze leicht/mittel/stark, Auswahl in Settings)
+3. Statistik-Anzeige für den Spieler (eigene Datei, hört `game:over`, Store-Schlüssel `stats`)
+4. Farbenblind-Modus (CSS-Klasse am body, Muster zusätzlich zu Farbe)
+5. Weitere Kartenrückseiten (Design-Bedienfeld, `Settings.cardBack`)
+6. Pass-and-Play (zweiter Mensch statt AI in `Flow._aiRound`)
+7. Interaktives Tutorial
+8. Querformat-Seitenpanel
+
+---
+
+## 9. Erkenntnisse / Stolperfallen
+
+- **GitHub-Upload am Handy:** „Etwas ist gewaltig schiefgelaufen…" ist ein GitHub-Glitch.
+  Vom Laptop hochladen oder „Add file → Create new file" + Inhalt einfügen.
+- **Seite unstyled:** `…/Skipo/style.css` direkt im Browser öffnen; Dateiname exakt, flach.
+- **Cache:** Hart neu laden (Strg+F5 / Cmd+Shift+R); `?v=`-Nummer ist der sichere Weg.
+- **Geister-KI:** in 7.0.1 durch `AI.busy` + awaited Rekursion + `AI.over()` an jedem
+  `await` gelöst. Wer einen In-Page-Neustart baut: `Flow.startGame()` setzt `turn.over`
+  und wartet `AI.busy` ab – nichts anderes benutzen.
+- **Playwright-Test:** gewählte Karten schweben (Animation) → Klicks mit `force`.

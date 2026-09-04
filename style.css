@@ -1,13 +1,14 @@
 /* ============================================================
-   Skip-Bo Mobile - Stylesheet  (style.css)
-   Version 7.0.0 - ausgelagert aus SkipBo_6_6_0.html (16.06.2026)
-   Inhalt 1:1 wie v6.6.0 - nur verschoben, inhaltlich nichts geaendert.
-   Diese Datei MUSS direkt neben SkipBo_7_0_0.html liegen (kein Unterordner).
+   Skipo (Skip-Bo Mobile) - Stylesheet  (style.css)
+   Version 7.0.1 (04.09.2026)
+   Basis: style.css 7.0.0 unveraendert (Karten, Felder, Farben,
+   Animationen, Design-Bedienfeld). Neu am Ende der Datei: alles,
+   was 7.0.0 noch als Inline-Style im HTML oder per JS in den
+   <head> injizierte (Menue-Button, Schnellmenue, Statuszeile,
+   Stock-Rahmen, Einstellungen-Fenster, Endscreen, Sprachwahl).
+   Diese Datei MUSS direkt neben SkipBo_7_0_1.html liegen.
    ============================================================ */
 
-/* ============================================================ */
-/* BASIS-RESET & BOX-SIZING                                     */
-/* ============================================================ */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -582,4 +583,345 @@ html, body {
 .design-close {
   margin-top: 12px; width: 100%; padding: 12px; border: none; border-radius: 10px;
   background: #0d7d8c; color: #fff; font-size: 0.92rem; font-weight: bold; cursor: pointer;
+}
+
+
+/* ============================================================ */
+/* 7.0.1 – MENÜ-BUTTON & SCHNELLMENÜ (vorher Inline im HTML)     */
+/* ============================================================ */
+#menu-btn {
+  position:      fixed;
+  right:         8px;
+  top:           6px;
+  background:    rgba(255,255,255,0.2);
+  border:        1px solid rgba(255,255,255,0.4);
+  border-radius: 6px;
+  color:         white;
+  font-size:     1rem;
+  padding:       4px 10px;
+  cursor:        pointer;
+  touch-action:  manipulation;
+  line-height:   1.4;
+  z-index:       1050;
+  -webkit-tap-highlight-color: transparent;
+}
+#quick-menu {
+  display:       none;
+  position:      fixed;
+  top:           44px;
+  right:         8px;
+  background:    rgba(20, 30, 20, 0.97);
+  border:        1px solid rgba(255,255,255,0.25);
+  border-radius: 10px;
+  z-index:       1100;
+  min-width:     200px;
+  box-shadow:    0 6px 20px rgba(0,0,0,0.5);
+  overflow:      hidden;
+}
+#quick-menu.open { display: block; }
+.qm-version {
+  padding:       10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size:     0.8rem;
+  color:         rgba(255,255,255,0.5);
+}
+.qm-btn-close { color: rgba(255,100,100,0.9); }
+
+/* ============================================================ */
+/* 7.0.1 – STATUSZEILE (vorher per JS gesetzt)                   */
+/* ============================================================ */
+#status-text {
+  font-size:   1.5rem;
+  color:       black;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+}
+
+/* ============================================================ */
+/* 7.0.1 – STOCK-RAHMEN AKTIVER SPIELER (vorher per JS injiziert) */
+/* ============================================================ */
+.animated-stock-border {
+  border:        4.5px solid;
+  border-image:  linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet) 1;
+  animation:     blinkActiveStock 1s linear infinite;
+  border-radius: 8px;
+}
+.static-stock-border {
+  border:        4.5px solid gray;
+  border-radius: 8px;
+}
+@keyframes blinkActiveStock {
+  0%   { filter: brightness(1);   }
+  50%  { filter: brightness(1.5); }
+  100% { filter: brightness(1);   }
+}
+
+/* ============================================================ */
+/* 7.0.1 – EINSTELLUNGEN-FENSTER (vorher per JS injiziert)       */
+/* ============================================================ */
+#overlay-container {
+  position:      fixed;
+  top:           20%;
+  left:          50%;
+  transform:     translateX(-50%);
+  width:         80%;
+  height:        65%;
+  background:    linear-gradient(to bottom, #000, #777);
+  border-radius: 15px;
+  z-index:       2000;
+  display:       none;
+  padding:       10px;
+  border:        3px solid;
+  border-image:  linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet) 1;
+  animation:     flashBorder 5s linear infinite;
+}
+@keyframes flashBorder {
+  0%   { filter: hue-rotate(  0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+#overlay-header {
+  position:      relative;
+  height:        40px;
+  margin-bottom: 10px;
+}
+#btn-uebernehmen {
+  position:      absolute;
+  top:           20px;
+  left:          20px;
+  width:         90px;
+  height:        30px;
+  background:    blue;
+  color:         white;
+  border:        none;
+  border-radius: 5px;
+  box-shadow:    0 4px 6px rgba(0, 0, 0, 0.3);
+  cursor:        pointer;
+  transition:    transform 0.2s;
+}
+#btn-uebernehmen:active { transform: scale(0.95); }
+#btn-schliessen {
+  position:      absolute;
+  top:           20px;
+  right:         20px;
+  height:        30px;
+  width:         auto;
+  background:    grey;
+  color:         white;
+  border:        none;
+  border-radius: 5px;
+  cursor:        pointer;
+}
+#input-name {
+  position:      absolute;
+  top:           20px;
+  left:          calc(20px + 90px + 10px);
+  right:         calc(20px + 70px + 10px);
+  height:        20px;
+  border-radius: 5px;
+  border:        1px solid #ccc;
+  padding:       5px;
+}
+#overlay-info {
+  position:      absolute;
+  top:           80px;
+  left:          50%;
+  transform:     translateX(-50%);
+  width:         70%;
+  bottom:        90px;
+  background:    #eee;
+  color:         black;
+  overflow-y:    auto;
+  padding:       10px;
+  border-radius: 10px;
+}
+#overlay-info h1, #overlay-info h2, #overlay-info h3 { color: darkred; }
+#overlay-info p   { color: black; margin-bottom: 10px; }
+#overlay-info li  { color: blue; }
+.speed-control-container {
+  position:      absolute;
+  bottom:        20px;
+  left:          5%;
+  right:         5%;
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  padding:       10px;
+  background:    rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+#speed-value {
+  width:        110px;
+  text-align:   center;
+  margin-right: 10px;
+  transform:    translateX(-10px);
+}
+.speed-label {
+  font-size:  0.9rem;
+  color:      #fff;
+  width:      110px;
+  text-align: center;
+}
+.speed-slider {
+  flex:               1;
+  max-width:          180px;
+  margin:             0 10px;
+  -webkit-appearance: none;
+  height:             6px;
+  background:         #ddd;
+  border-radius:      3px;
+  outline:            none;
+}
+.speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width:              18px;
+  height:             18px;
+  background:         #ffd700;
+  border-radius:      50%;
+  cursor:             pointer;
+  transition:         transform 0.2s;
+}
+
+/* ============================================================ */
+/* 7.0.1 – SPIELENDE (vorher Inline-Styles im JS)                */
+/* ============================================================ */
+.end-overlay {
+  position:         fixed;
+  top:              5vh;
+  left:             0;
+  width:            100vw;
+  height:           90vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  display:          flex;
+  flex-direction:   column;
+  justify-content:  flex-start;
+  align-items:      center;
+  color:            white;
+  font-size:        2em;
+  font-weight:      bold;
+  z-index:          3000;
+  text-align:       center;
+  overflow-y:       auto;
+  padding-top:      20px;
+  padding-bottom:   env(safe-area-inset-bottom);
+  pointer-events:   auto;
+}
+.end-box {
+  background:     #1a1d24;
+  color:          #e0e0e0;
+  padding:        28px;
+  border-radius:  14px;
+  box-shadow:     0 0 30px rgba(0, 212, 255, 0.2);
+  border:         1px solid rgba(0, 212, 255, 0.3);
+  position:       relative;
+  width:          88%;
+  max-width:      560px;
+  pointer-events: auto;
+}
+.end-title {
+  font-size:   1.6em;
+  text-align:  center;
+  margin:      0 0 16px;
+  color:       #ffd700;
+}
+.end-result {
+  background:    rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding:       14px 18px;
+  margin-bottom: 18px;
+  font-size:     1em;
+  line-height:   1.8;
+}
+.end-buttons {
+  display:       flex;
+  gap:           10px;
+  margin-bottom: 14px;
+  flex-wrap:     wrap;
+}
+.end-btn {
+  flex:          1;
+  min-width:     120px;
+  padding:       12px;
+  border:        none;
+  border-radius: 8px;
+  font-weight:   bold;
+  touch-action:  manipulation;
+}
+.end-btn-restart {
+  background: linear-gradient(135deg, #4CAF50, #2e7d32);
+  color:      white;
+  font-size:  0.9em;
+  cursor:     pointer;
+}
+.end-btn-tuner {
+  background: rgba(255,255,255,0.1);
+  color:      #8b9bb4;
+  font-size:  0.85em;
+  cursor:     default;
+}
+.end-btn-tuner.ready {
+  background: linear-gradient(135deg, #00d4ff, #00b36b);
+  color:      #000;
+  cursor:     pointer;
+}
+.tuner-scroll {
+  background:    rgba(0,0,0,0.3);
+  border:        1px solid rgba(0,212,255,0.2);
+  border-radius: 10px;
+  padding:       14px;
+  max-height:    340px;
+  overflow-y:    auto;
+}
+.ta-wrap   { font-size: 0.85em; line-height: 1.6; }
+.ta-header { text-align: center; color: #ffd700; font-weight: bold; margin-bottom: 12px; }
+.ta-box    { margin-bottom: 10px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px; }
+.ta-hint   { color: #00d4ff; }
+.ta-footer { color: #8b9bb4; font-size: 0.85em; margin-top: 10px; text-align: center; }
+.ta-wait   { color: #aaa; text-align: center; }
+
+/* ============================================================ */
+/* 7.0.1 – SPRACHWAHL (vorher Inline-Styles im JS)               */
+/* ============================================================ */
+.lang-overlay {
+  position:        fixed;
+  inset:           0;
+  background:      rgba(0,0,0,0.65);
+  z-index:         3500;
+  display:         none;
+  align-items:     center;
+  justify-content: center;
+}
+.lang-box {
+  background:    #1a2a1d;
+  border:        1px solid rgba(255,255,255,0.3);
+  border-radius: 14px;
+  padding:       18px 20px;
+  width:         82%;
+  max-width:     320px;
+  box-shadow:    0 8px 28px rgba(0,0,0,0.6);
+  color:         #fff;
+}
+.lang-title { font-weight: bold; margin-bottom: 10px; text-align: center; }
+.lang-btn {
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  width:         100%;
+  padding:       12px 16px;
+  margin:        6px 0;
+  font-size:     1.05em;
+  cursor:        pointer;
+  background:    rgba(255,255,255,0.08);
+  color:         #fff;
+  border:        1px solid rgba(255,255,255,0.25);
+  border-radius: 10px;
+  touch-action:  manipulation;
+}
+.lang-cancel {
+  width:      100%;
+  padding:    10px;
+  margin-top: 8px;
+  background: transparent;
+  color:      rgba(255,120,120,0.95);
+  border:     none;
+  font-size:  0.95em;
+  cursor:     pointer;
 }
