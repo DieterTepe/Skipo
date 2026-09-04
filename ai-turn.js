@@ -28,6 +28,11 @@ const AI = {
     return State.turn.over || Rules.winner() !== null;
   },
 
+  /** Blockade-Taktik (ki-taktik.js) aktiv? → Objekt, sonst null. */
+  taktik() {
+    return (typeof KI_TAKTIK !== 'undefined' && KI_TAKTIK && KI_TAKTIK.ENABLED) ? KI_TAKTIK : null;
+  },
+
   /** Statusmeldung (Schlüssel + Werte). */
   say(key, ...args) { I18n.say(key, ...args); },
 
@@ -83,7 +88,7 @@ const AI = {
     await Clock.pause(0.8);
     if (this.over()) return;
 
-    const enemy = AI.Analysis.predictEnemyStock('human');
+    const enemy = AI.Analysis.enemyTarget('human');
 
     this.say('aiAnalyze');
     await Clock.pause(0.5);
@@ -161,6 +166,8 @@ const AI = {
     if (this.over()) return false;
 
     // ── Getunte Kandidatenschleife ────────────────────────────────
+    const T = this.taktik();
+    for (let round = 0; round < 4; round++) {
     do {
       if (this.over()) return false;
       this.say('aiCompute');
@@ -171,6 +178,7 @@ const AI = {
       if (candidates.length === 0) {
         const stockPlayed = await this.stockFallback();
         if (!stockPlayed) noMoreMoves = true;
+        else if (T && T.CONTINUE_AFTER_FALLBACK) { moveCount++; if (this.over()) return false; continue; }
         break;
       }
 
@@ -199,6 +207,35 @@ const AI = {
       await Clock.pause(1.0);
     } while (!noMoreMoves && !this.over());
 
+    // Taktik: offenen Stapel notfalls mit Joker zudecken, dann ggf. weiterspielen
+    if (this.over() || !T || !(await this.jokerCover(T))) break;
+    moveCount++;
+    noMoreMoves = false;
+    if (await this.redrawIfHandEmpty()) {
+      moveCount += await AI.Planner.runChains();
+      if (this.over()) return false;
+    }
+    }
+    return false;
+  },
+
+  /** Taktik: einen für die Gegner-Stockkarte offenen Stapel mit einem Hand-Joker zudecken. */
+  async jokerCover(T) {
+    if (!T.JOKER_COVER_LIMIT) return false;
+    const th = AI.Analysis.threat();
+    if (!th || th.open.length === 0 || th.oppStock > T.JOKER_COVER_LIMIT) return false;
+    const ai = State.player('ai');
+    const j  = ai.hand.findIndex(c => c.type === 'joker');
+    if (j === -1) return false;
+    const pile = th.open[0];
+    this.say('aiJokerCover', th.value, pile + 1);
+    await Clock.pause(1.0);
+    if (this.over()) return false;
+    if (Rules.playToBuild('ai', 'hand', j, pile)) {
+      this.note('kiMove', { sourceType: 'hand', cardValue: '★', cardType: 'joker', buildPileIndex: pile, score: T.COVER_BONUS });
+      await Clock.pause(0.5);
+      return true;
+    }
     return false;
   },
 
@@ -366,7 +403,10 @@ const AI = {
         ...ai.hand.map((c, i) => ({ card: c, type: 'hand', index: i })),
         { card: ai.stock.slice(-1)[0], type: 'stock', index: 0 }
       ].filter(({ card }) => card && (card.value === targetValue || card.type === 'joker'));
-      if (validCards.length === 0) return false;
+      const T = this.taktik();
+      const usable = (T && !T.ATTACK_JOKER) ? validCards.filter(c => c.card.type !== 'joker') : validCards;
+      if (usable.length === 0) return false;
+      validCards.length = 0; validCards.push(...usable);
 
       // Nicht-Joker bevorzugen, darunter höheren Wert zuerst
       validCards.sort((a, b) =>

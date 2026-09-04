@@ -2,7 +2,9 @@
 // ================================================================
 //  test-sim.js  –  Skipo 7.0.1   PRÜFSTAND (nur Node, nicht im Spiel)
 // ----------------------------------------------------------------
-//  Aufruf:   node test-sim.js [Spiele] [Seed] [--old=ORDNER] [--new-only]
+//  Aufruf:   node test-sim.js [Spiele] [Seed] [--old=ORDNER] [--new-only] [--taktik]
+//            --taktik: Blockade-Taktik (ki-taktik.js) eingeschaltet lassen – dann ist
+//            keine Äquivalenz zu 7.0.0 zu erwarten (nur mit --new-only sinnvoll).
 //  Beispiel: node test-sim.js 300 42
 //
 //  Was passiert:
@@ -35,7 +37,8 @@ const NEWONLY = args.includes('--new-only');
 const OLDDIR  = (args.find(a => a.startsWith('--old=')) || '').slice(6) || __dirname;
 const DIR     = __dirname;
 
-const NEW_FILES = ['konfig.js', 'ki-planner.js', 'core-events.js', 'core-store.js', 'core-settings.js',
+const TAKTIK  = args.includes('--taktik');       // Blockade-Taktik (7.0.2) eingeschaltet lassen
+const NEW_FILES = ['konfig.js', 'ki-planner.js', 'ki-taktik.js', 'core-events.js', 'core-store.js', 'core-settings.js',
                    'core-i18n.js', 'core-state.js', 'core-rules.js', 'ai-turn.js', 'ai-planner.js',
                    'ai-eval.js', 'ai-analysis.js', 'core-flow.js', 'tracking.js'];
 const OLD_FILES = ['konfig.js', 'ki-planner.js', 'state.js', 'engine.js', 'view.js', 'ai.js', 'endgame.js'];
@@ -80,10 +83,11 @@ function makeNew() {
   const qc = quietConsole();
   const sandbox = { console: qc.obj, setTimeout, clearTimeout, setImmediate, Date, JSON, Math };
   const ctx = vm.createContext(sandbox);
-  loadInto(ctx, DIR, NEW_FILES);
+  loadInto(ctx, DIR, NEW_FILES.filter(f => f !== 'ki-taktik.js' || fs.existsSync(path.join(DIR, f))));
   vm.runInContext(`
     Settings.load(); I18n.init(); Tracking.init();
     Clock.pause = () => Promise.resolve();
+    if (typeof KI_TAKTIK !== 'undefined') KI_TAKTIK.ENABLED = ${TAKTIK};
     globalThis.__log = [];
     globalThis.__humanReady = false;
     Events.on('move:build',   d => __log.push(d.player + ':' + d.source + ':' + (d.card.type === 'joker' ? 'J' : d.card.value) + '>B' + d.pile));
@@ -305,7 +309,7 @@ function truncateAtWin(log) {
 // HAUPTPROGRAMM
 // ================================================================
 (async function main() {
-  console.log(`Skipo 7.0.1 Prüfstand – ${GAMES} Spiele, Seed ${SEED}${NEWONLY ? ' (nur neue Engine)' : ''}`);
+  console.log(`Skipo Prüfstand – ${GAMES} Spiele, Seed ${SEED}${NEWONLY ? ' (nur neue Engine)' : ''}${TAKTIK ? ' (Taktik AN)' : ' (Taktik AUS = 7.0.1-Verhalten)'}`);
   const t0 = Date.now();
 
   const engNew = makeNew();

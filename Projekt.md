@@ -1,12 +1,20 @@
-# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.1
+# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.2
 
 > **Zweck dieser Datei:** Übergabe-Dokument. Wer einen neuen Chat startet, liest
 > zuerst diese Datei und weiß sofort, was Stand, Regeln, Entscheidungen und
 > nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
-**Letzte Aktualisierung:** 04.09.2026 — **7.0.1 fertig gebaut und in der Sandbox
-geprüft** (Node-Simulation, Äquivalenz gegen 7.0.0, Browser-Test mit Chrome).
-Offen: Live-Test durch Dieter auf GitHub Pages.
+**Letzte Aktualisierung:** 04.09.2026 — **7.0.2 fertig gebaut und in der Sandbox
+geprüft** (Äquivalenz gegen 7.0.0 bei Taktik AUS, Invarianten bei Taktik AN,
+Browser-Test, KI-Tuning mit tune-sim.js). Offen: Live-Test durch Dieter.
+7.0.1 war am 04.09.2026 live und abgenommen.
+
+**Neu in 7.0.2:** (1) Blockade-Taktik in `ki-taktik.js` – die KI verweigert Züge, die
+einen Baustapel für die sichtbare Gegner-Stockkarte öffnen, und hebt Joker für
+Planer-Ketten auf → **59 % Siegrate gegen 7.0.1** (2000 gepaarte Spiele, ±2), gegen den
+einfachen Bot 80 % statt 73 %. (2) **Auswertung beider Seiten** im Endscreen.
+(3) `tune-sim.js` – KI-gegen-KI-Prüfstand für alle künftigen KI-Änderungen.
+Befunde in Abschnitt 10.
 
 ---
 
@@ -19,8 +27,9 @@ Offen: Live-Test durch Dieter auf GitHub Pages.
 - **7.0.0** (`SkipBo_7_0_0.html` + state/engine/view/ai/endgame.js) und **6.6.0**
   bleiben unangetastet im Repo als Referenz. `test-sim.js` braucht die 7.0.0-JS-Dateien
   für den Vergleich – **nicht löschen**.
-- Hauptdatei: `SkipBo_7_0_1.html`. Alle Dateien flach im Ordner `Skipo`,
-  absolute URLs mit `?v=7.0.1`.
+- Hauptdatei: `SkipBo_7_0_2.html`. Alle Dateien flach im Ordner `Skipo`,
+  absolute URLs mit `?v=7.0.2`. (`SkipBo_7_0_1.html` kann gelöscht werden – sie lädt
+  dieselben JS-Dateien und wäre nur „7.0.2 ohne Taktik".)
 - Ukrainisch ist entfallen (Entscheidung 04.09.2026). Drei Sprachen: DE, EN, PT.
 - Neues Spiel = Seitenreload (wie 7.0.0); `Flow.startGame()` kann aber auch in-page.
 
@@ -34,6 +43,7 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 │  ── Konfiguration (Tuner-Schnittstelle, unverändert übernommen) ──
 ├── konfig.js            let KONFIG      Tuner-Werte SCORE_* – NUR dieser Block wird vom Tuner ersetzt
 ├── ki-planner.js        const KI_PLANNER Planer-Konfiguration
+├── ki-taktik.js         let KI_TAKTIK   Blockade-Taktik (7.0.2) – ENABLED:false = 7.0.1-Verhalten
 │
 │  ── core: Fundament, KEIN DOM, läuft in Node ──
 ├── core-events.js       Events    on / off / emit – Ereignisbus
@@ -74,13 +84,14 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 │                                  · showLanguage · showEnd · tunerAnalysisHTML · infoWindow
 ├── app.js               App       init (Reihenfolge: Settings → I18n → Tracking → Render/Input/Menu/Overlays → Flow)
 │
-│  ── Werkzeug ──
-├── test-sim.js          Prüfstand (nur Node; nicht im HTML geladen), siehe Abschnitt 5
+│  ── Werkzeuge (nur Node, nicht im HTML geladen) ──
+├── test-sim.js          Prüfstand: Invarianten + Äquivalenz gegen 7.0.0, siehe Abschnitt 5
+├── tune-sim.js          KI-Tuning: KI gegen KI, Konfigurationsvergleich, Sweep, siehe Abschnitt 10
 │
-├── SkipBo_7_0_1.html    DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
+├── SkipBo_7_0_2.html    DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
 ├── style.css            CSS 7.0.0 unverändert + neuer Block am Ende (Menü, Statuszeile, Stock-Rahmen,
 │                        Einstellungen, Endscreen, Sprachwahl – vorher Inline/JS-injiziert)
-├── impressum.html / datenschutz.html   „Zurück"-Link auf SkipBo_7_0_1.html
+├── impressum.html / datenschutz.html   „Zurück"-Link auf SkipBo_7_0_2.html
 ├── Projekt.md           diese Datei
 ├── SkipBo_7_0_0.html + state.js engine.js view.js ai.js endgame.js   Referenz 7.0.0 (für test-sim.js nötig)
 └── SkipBo_6_6_0.html    Ur-Referenz
@@ -118,7 +129,8 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 | KI-Verhalten | `ai-*.js`; danach `node test-sim.js` – erwartete Abweichung vom 7.0.0-Vergleich dann dokumentieren |
 | Neues Overlay | `ui-overlays.js` Methode + CSS-Klassen in `style.css` (keine Inline-Styles) |
 | Sound / Statistik / Schwierigkeitsgrad | neue Datei, hört auf `move:*`, `game:over`, `turn:change`; wird in `app.js` initialisiert |
-| Release | alle `?v=7.0.1` in `SkipBo_7_0_1.html` gemeinsam hochzählen |
+| KI stärker machen | Idee als Schalter in `ki-taktik.js` → `node tune-sim.js --games=1000 T:SCHALTER=true` → nur übernehmen, wenn > 53 % bei ±2 (Abschnitt 10) |
+| Release | alle `?v=7.0.2` in `SkipBo_7_0_2.html` gemeinsam hochzählen |
 
 ---
 
@@ -161,10 +173,12 @@ Joker-Begründungen sind jetzt in allen drei Sprachen (waren deutsch).
 
 ```
 cd Skipo
-node test-sim.js 300 42            # Simulation + Invarianten + Äquivalenz gegen 7.0.0
-node test-sim.js 100 7 --new-only  # nur neue Engine (wenn 7.0.0-Dateien fehlen)
+node test-sim.js 300 42              # Taktik AUS: Invarianten + Äquivalenz gegen 7.0.0
+node test-sim.js 300 42 --new-only --taktik   # Taktik AN: Invarianten (keine Äquivalenz erwartet)
 node test-sim.js 300 42 --old=../anderer-ordner
 ```
+Der Äquivalenzlauf schaltet `KI_TAKTIK.ENABLED` aus und beweist damit, dass die
+Grund-Engine (Regeln, Planer, Heuristik) unverändert ist.
 - Lädt core/ai/flow/tracking in Node **ohne DOM** (Regel 3 wird erzwungen).
 - Deterministischer Mensch-Bot gegen die KI, Zufall nur beim Mischen (Seed).
 - Invarianten je Zug: 156 Karten, Baustapel 1→12, Hand ≤ 5, jedes Spiel endet.
@@ -183,11 +197,12 @@ Endscreen, Migration alter Schlüssel, Erststart – alle bestanden, 0 Konsolenf
 
 ## 6. Nächste Schritte
 
-1. **Dieter:** kompletten Dateisatz hochladen (alle 7.0.1-Dateien, `style.css` und die
-   Rechtsseiten überschreiben), dann live testen:
-   `https://dietertepe.github.io/Skipo/SkipBo_7_0_1.html` – Touch, Menüs, Sprachen,
-   Design, ein Spiel bis zum Ende. Hart neu laden (Cache).
-2. Danach Ideenpool (Abschnitt 8) – jetzt jeweils Einzeldatei-Änderungen.
+1. **Dieter:** 7.0.2-Dateien hochladen (Liste in Abschnitt 11), live testen:
+   `https://dietertepe.github.io/Skipo/SkipBo_7_0_2.html` – ein Spiel bis zum Ende,
+   Endscreen mit Vergleichstabelle prüfen; hart neu laden (Cache).
+2. Danach: weitere KI-Ideen über tune-sim.js messen (Abschnitt 10, „Offene Ideen")
+   oder Ideenpool (Abschnitt 8). Arbeitsweise: Claude baut + misst + prüft, Dieter
+   erhält nur die geänderten Dateien.
 
 ---
 
@@ -199,7 +214,10 @@ Endscreen, Migration alter Schlüssel, Erststart – alle bestanden, 0 Konsolenf
 - Online-only über GitHub Pages; Offline/PWA kein Ziel.
 - Kein echtes SKIP-BO-Logo (CSS-Text bleibt). Querformat-Seitenpanel: später.
 - 6.6.0 und 7.0.0 bleiben als Referenz im Repo (7.0.0-JS wird vom Prüfstand gebraucht).
-- KONFIG/KI_PLANNER unverändert (Tuner-Schnittstelle).
+- KONFIG/KI_PLANNER unverändert (Tuner-Schnittstelle). Neue KI-Werte kommen in
+  `ki-taktik.js`, nie in den Tuner-Block (04.09.2026).
+- Maßstab für KI-Änderungen ist ausschließlich die gemessene Siegrate in tune-sim.js
+  (gepaarte Spiele, ≥ 2000, Übernahme ab > 53 % bei ±2), nicht die 5-Spiele-Auswertung.
 
 ---
 
@@ -226,3 +244,75 @@ Endscreen, Migration alter Schlüssel, Erststart – alle bestanden, 0 Konsolenf
   `await` gelöst. Wer einen In-Page-Neustart baut: `Flow.startGame()` setzt `turn.over`
   und wartet `AI.busy` ab – nichts anderes benutzen.
 - **Playwright-Test:** gewählte Karten schweben (Animation) → Klicks mit `force`.
+
+
+---
+
+## 10. KI-Tuning 7.0.2 – Werkzeug, Befunde, Ergebnis
+
+### 10.1 tune-sim.js (KI gegen KI)
+
+```
+node tune-sim.js --games=500                      # Kontrolle A gegen A → exakt 50 %
+node tune-sim.js --games=1000 K:SCORE_42=0        # Herausforderer B = KONFIG-Änderung
+node tune-sim.js --games=1000 T:AVOID_OPEN=true   # B = KI_TAKTIK-Schalter (ENABLED wird gesetzt)
+node tune-sim.js --games=1000 P:MAX_DEPTH=20      # B = KI_PLANNER-Änderung
+node tune-sim.js --games=1000 --bot               # B gegen den einfachen Bot
+node tune-sim.js --games=300 --sweep              # jeden KONFIG-Wert ×0 / ×0.5 / ×2 → tune-results.jsonl
+```
+A = aktueller Stand mit `KI_TAKTIK.ENABLED = false`. Jedes Spiel wird zweimal gespielt
+(gleiche Karten, Sitze getauscht) → Kartenglück und Anfangsvorteil heben sich auf.
+~60 Spiele/s. Ausgabe: Siegrate von B mit 95-%-Intervall, Stockdifferenz, Züge.
+Trick: Für den Sitz „human" werden Spielerobjekte und Ablage-Historie getauscht;
+Spielcode bleibt unberührt.
+
+### 10.2 Befund: Die Score-Werte entscheiden fast nichts
+
+Sweep über alle 71 KONFIG-Werte (je ×0, ×0.5, ×2, 600 Spiele): **54 Werte ohne jede
+messbare Wirkung**, die übrigen ≤ ±3 Punkte (im Rauschen). Grund: Die KI spielt
+**jeden** gültigen Zug, den sie findet – die Scores bestimmen nur die Reihenfolge.
+Der Planer (Ketten) macht die meisten Züge (≈ 53 %), die Heuristik den Rest.
+KI_PLANNER-Werte (Tiefe, Knoten, Joker je Kette, Risikogrenze): ebenfalls ohne Wirkung.
+Einzige Bestätigung mit 2000 Spielen: **SCORE_42 = 0** (Joker nicht über die Heuristik
+spielen) → 52,9 % ± 2,2. In 7.0.2 als Schalter `JOKER_HEURISTIC:false` umgesetzt,
+damit der Tuner-Block unangetastet bleibt.
+
+### 10.3 Was wirkt: Züge verweigern (Blockade-Taktik)
+
+| Maßnahme (je 1000–2000 Spiele) | Siegrate B |
+|---|---|
+| Nur Score-Malus/-Bonus für öffnende/zudeckende Züge | 50 % (Reihenfolge ändert nichts) |
+| Joker am Zugende zum Zudecken | 50 % |
+| Planer bevorzugt Ketten, die nicht offen enden | 50 % |
+| **AVOID_OPEN** – Karte V−1 nicht spielen (immer) | **53–54 %** |
+| AVOID_OPEN nur bei Gegner-Stock ≤ 12 / ≤ 6 | 53,7 % / 51,5 % |
+| + **AVOID_SECOND** (V−2 nicht, wenn Brücke V−1 sichtbar) | **55–57 %** |
+| + auch Gegner-Ablagekarten meiden | 56,4 % (kein Gewinn) |
+| + **JOKER_HEURISTIC:false** | **58,6 % / 59,2 %** (zwei Seeds) |
+| Gesamt gegen einfachen Bot | **80,3 %** (7.0.1: 73,0 %) |
+
+Gemessene Eigenheiten der alten Blockade-Logik: `getOpponentCriticalNumbers` liefert
+V+1 statt V−1, und die Stock-Attacke wartet auf 60 % Konfidenz, die die Vorhersage nie
+erreicht (max. ~12 %) – der Blockade-Teil war praktisch inaktiv. Beides bleibt aus
+Tuner-Kompatibilität unverändert; die neue Taktik arbeitet daneben.
+
+### 10.4 Offene Ideen (messbar mit tune-sim.js)
+- Verweigern auch für die zweite Karte im Gegner-Stock (nicht sichtbar → nein).
+- Ablage-Strategie: Karten so ablegen, dass Ketten entstehen; sichtbare Gegner-
+  Ablagekarten berücksichtigen (bisher: keine Wirkung messbar).
+- Schwierigkeitsgrade = KI_TAKTIK.ENABLED false/true + KONFIG-Sätze.
+
+---
+
+## 11. Dateisatz 7.0.2 (was gegenüber 7.0.1 neu/anders ist)
+
+**Neu:** `ki-taktik.js`, `tune-sim.js`, `SkipBo_7_0_2.html`
+**Geändert:** `ai-turn.js`, `ai-eval.js`, `ai-analysis.js`, `ai-planner.js` (Taktik-Haken,
+bei Taktik AUS identisch), `tracking.js` + `ui-overlays.js` + `core-i18n.js` + `style.css`
+(Vergleich beider Seiten, Meldung aiJokerCover), `app.js` (Version), `test-sim.js`
+(`--taktik`), `impressum.html`/`datenschutz.html` (Zurück-Link), `Projekt.md`.
+**Unverändert:** `konfig.js`, `ki-planner.js`, `core-events/store/settings/state/rules/flow.js`,
+`ui-render.js`, `ui-input.js`, `ui-menu.js`.
+
+Prüfstand 04.09.2026: Äquivalenz gegen 7.0.0 (Taktik AUS) ✅ · Invarianten (Taktik AN) ✅
+· 573 Namensraum-Verweise ✅ · Sprachschlüssel/IDs/Klassen ✅ · Browser-Test 61 Prüfungen ✅.

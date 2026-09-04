@@ -205,6 +205,13 @@ AI.Eval = {
   filter(candidates, player, nagel40, nagel41, nagel42) {
     if (candidates.length === 0) return [];
 
+    const T = AI.taktik();
+    if (T && T.JOKER_HEURISTIC === false) {
+      candidates = candidates.filter(m => m.card.type !== 'joker');
+      if (candidates.length === 0) return [];
+    }
+    if (T) this.applyThreat(candidates, T);
+
     const avgScore         = candidates.reduce((s, m) => s + m.score, 0) / candidates.length;
     const dynamicThreshold = avgScore * nagel40;
     candidates.forEach(m => { if (m.card.type === 'joker') m.score *= nagel42; });
@@ -221,7 +228,7 @@ AI.Eval = {
       if (onlyJoker && bestJokerScore < nagel41) return [];
     }
 
-    const enemyAnalysis = AI.Analysis.predictEnemyStock('human');
+    const enemyAnalysis = AI.Analysis.enemyTarget('human');
     const priorities    = this.dynamicPriorities();
     const blockTargets  = AI.Analysis.discardPatterns();
     if (KONFIG.DEBUG_N3 && blockTargets.length > 0) {
@@ -250,7 +257,46 @@ AI.Eval = {
       move.score = Math.round(move.score * priorities.riskTaking);
     });
 
-    return filtered.sort((a, b) => b.score - a.score);
+    const result = filtered.sort((a, b) => b.score - a.score);
+    return T ? result.filter(m => !m.avoid) : result;
+  },
+
+  /**
+   * Blockade-Taktik (7.0.2): Kandidaten nach ihrer Wirkung auf die sichtbare
+   * Gegner-Stockkarte V bewerten – öffnen (V-1) bestrafen, zudecken (V) belohnen.
+   */
+  applyThreat(candidates, T) {
+    const th = AI.Analysis.threat();
+    if (!th) return;
+    const V     = th.value;
+    const piles = State.game.buildPiles;
+    const me    = State.player('ai');
+    const w     = th.oppStock <= T.ENDGAME_LIMIT
+      ? 1 + (T.ENDGAME_FACTOR - 1) * (T.ENDGAME_LIMIT + 1 - th.oppStock) / T.ENDGAME_LIMIT
+      : 1;
+    const canFollow = me.hand.some(c => (T.FOLLOW_JOKER && c.type === 'joker') || c.value === V) ||
+                      me.discards.some(d => d.length > 0 && d[d.length - 1].value === V);
+
+    for (const m of candidates) {
+      const pile = piles[m.buildPileIndex];
+      const eff  = m.card.type === 'joker' ? Rules.nextNeeded(pile) : m.card.value;
+      if (eff === V - 1) {
+        let pen = T.OPEN_PENALTY * w;
+        if (m.sourceType === 'stock') pen *= T.OPEN_STOCKMOVE_FACTOR;
+        if (canFollow)                pen *= T.OPEN_FOLLOWUP_FACTOR;
+        m.score -= pen;
+        // Verzicht: öffnender Zug ohne eigene Deckkarte wird gar nicht gespielt
+        const stockOk = m.sourceType !== 'stock' || th.oppStock <= T.AVOID_STOCK_LIMIT;
+        m.avoid = T.AVOID_OPEN && !canFollow && stockOk && th.oppStock <= T.AVOID_OPEN_LIMIT;
+      } else if (eff === V) {
+        m.score += T.COVER_BONUS * w;
+      } else if (eff === V - 2 && th.bridge) {
+        m.score -= T.SECOND_PENALTY * w;
+        m.avoid = T.AVOID_SECOND && m.sourceType !== 'stock' && th.oppStock <= T.AVOID_OPEN_LIMIT;
+      } else if (T.AVOID_DISCARD_TOPS && m.sourceType !== 'stock' && th.tops.includes(eff + 1)) {
+        m.avoid = true;
+      }
+    }
   },
 
   // ----------------------------------------------------------------

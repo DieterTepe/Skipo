@@ -225,6 +225,7 @@ const Overlays = {
         <div>🏆 <strong>${I18n.t('winner')}:</strong> ${winnerName} 🎉</div>
         <div>💀 <strong>${I18n.t('loser')}:</strong> ${loserName} ${I18n.t('withPoints', result.points)}</div>
       </div>
+      ${this.compareHTML()}
       <div class="end-buttons">
         <button id="btn-restart" class="end-btn end-btn-restart">${I18n.t('btnNewGame')}</button>
         <button id="btn-auswertung" class="end-btn end-btn-tuner ${ready ? 'ready' : ''}">${btnLabel}</button>
@@ -246,6 +247,33 @@ const Overlays = {
       const panel = overlay.querySelector('#tuner-panel');
       panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     });
+  },
+
+  /** Vergleich beider Seiten: dieses Spiel + Durchschnitt (7.0.2). */
+  compareHTML() {
+    const g = Tracking.last;
+    if (!g) return '';
+    const avg  = Tracking.averages();
+    const rows = [['cmpStock', 'stock'], ['cmpHand', 'hand'], ['cmpCombo', 'combo'],
+                  ['cmpMissed', 'missed'], ['cmpOpened', 'opened'], ['cmpTurns', 'turns']];
+    const f = v => Number.isInteger(v) ? v : v.toFixed(1);
+    const table = (h, a, title, extra) => `
+      <div class="cmp-title">${title}</div>
+      <table class="cmp-table">
+        <tr><th></th><th>${I18n.t('cmpYou')}</th><th>${I18n.t('ai')}</th></tr>
+        ${rows.map(([k, f2]) => `<tr><td>${I18n.t(k)}</td><td>${f(h[f2])}</td><td>${f(a[f2])}</td></tr>`).join('')}
+        ${extra || ''}
+      </table>`;
+    let tips = '';
+    if (g.human.missed > 0) tips += `<div class="cmp-tip">${I18n.t('tipMissed', g.human.missed)}</div>`;
+    if (g.human.opened > 0) tips += `<div class="cmp-tip">${I18n.t('tipOpened', g.human.opened)}</div>`;
+    if (!tips) tips = `<div class="cmp-tip">${I18n.t('tipGood')}</div>`;
+    let html = `<div class="cmp-box">${table(g.human, g.ai, I18n.t('cmpTitle'))}${tips}`;
+    if (avg.games >= 2) {
+      const winsRow = `<tr><td>${I18n.t('cmpWins')}</td><td>${avg.human.wins}</td><td>${avg.ai.wins}</td></tr>`;
+      html += table(avg.human, avg.ai, I18n.t('cmpAvgTitle', avg.games), winsRow);
+    }
+    return html + '</div>';
   },
 
   /** 5-Spiele-Tuner-Auswertung als HTML (Schwellen 1:1 aus 6.6.0). */

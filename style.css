@@ -925,3 +925,14 @@ html, body {
   font-size:  0.95em;
   cursor:     pointer;
 }
+
+/* ============================================================ */
+/* 7.0.2 – VERGLEICH BEIDER SEITEN IM ENDSCREEN                 */
+/* ============================================================ */
+.cmp-box   { text-align: left; font-size: 0.5em; font-weight: normal; line-height: 1.5; margin-bottom: 14px; }
+.cmp-title { color: #ffd700; font-weight: bold; margin: 8px 0 4px; text-align: center; }
+.cmp-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; }
+.cmp-table th, .cmp-table td { padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.cmp-table th { color: #00d4ff; text-align: center; }
+.cmp-table td:nth-child(2), .cmp-table td:nth-child(3) { text-align: center; width: 22%; font-weight: bold; }
+.cmp-tip   { margin: 8px 4px 0; color: #00d4ff; }

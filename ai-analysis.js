@@ -53,6 +53,33 @@ AI.Analysis = {
     }
   },
 
+  /**
+   * Bedrohungslage aus der SICHTBAREN Gegner-Stockkarte (7.0.2, KI_TAKTIK).
+   * @returns {Object|null} { value V, open: [Baustapel, die V annehmen], bridge, oppStock }
+   *          null = Gegner-Stock leer oder Joker oben (keine bestimmbare Bedrohung)
+   */
+  threat() {
+    const human = State.player('human');
+    const top   = human.stock[human.stock.length - 1];
+    if (!top || top.type === 'joker') return null;
+    const V    = top.value;
+    const open = [];
+    State.game.buildPiles.forEach((p, i) => { if (Rules.nextNeeded(p) === V) open.push(i); });
+    const bridge = human.discards.some(d => d.length > 0 && d[d.length - 1].type !== 'joker' && d[d.length - 1].value === V - 1);
+    const tops   = human.discards.filter(d => d.length > 0 && d[d.length - 1].type !== 'joker').map(d => d[d.length - 1].value);
+    return { value: V, open, bridge, tops, oppStock: human.stock.length };
+  },
+
+  /** Gegner-Ziel: sichtbare Stockkarte (Taktik an) oder Wahrscheinlichkeitsschätzung. */
+  enemyTarget(opponent) {
+    const T = AI.taktik();
+    if (T && T.VISIBLE_STOCK && opponent === 'human') {
+      const th = this.threat();
+      if (th) return { nextExpected: th.value, confidence: 1, visible: true };
+    }
+    return this.predictEnemyStock(opponent);
+  },
+
   /** 3er-Serien in der Ablage-Historie (Mittelwerte). */
   consecutiveDiscards(player) {
     const values = State.game.history[player].filter(v => v !== 'joker' && typeof v === 'number');

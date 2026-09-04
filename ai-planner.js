@@ -139,9 +139,16 @@ AI.Planner = {
     let nodes = 0;
     let best  = null;
 
+    // Taktik (7.0.2): Ketten meiden, die einen Stapel für die Gegner-Stockkarte offen lassen
+    const T  = AI.taktik();
+    const th = (T && T.PLANNER_AVOID_OPEN) ? AI.Analysis.threat() : null;
+    const V  = th ? th.value : null;
+    const endsOpen = st => V !== null && st.builds.some(b => b + 1 === V);
+
     function better(cand) {
       if (!best) return true;
       if (cand.stockPlays !== best.stockPlays) return cand.stockPlays > best.stockPlays;
+      if (V !== null && cand.open !== best.open) return !cand.open;
       if (cand.jokers     !== best.jokers)     return cand.jokers     < best.jokers;
       return cand.moves.length < best.moves.length;
     }
@@ -169,12 +176,12 @@ AI.Planner = {
           if (nStock > 0) {
             const cut    = nPath.slice(0, nLastSt);
             const cutJok = cut.reduce((s, m) => s + (m.isJoker ? 1 : 0), 0);
-            const cand   = { moves: cut, stockPlays: nStock, jokers: cutJok };
+            const cand   = { moves: cut, stockPlays: nStock, jokers: cutJok, open: endsOpen(next) };
             if (better(cand)) best = cand;
           }
         } else {
           if (next.hand.length === 0) {
-            const cand = { moves: nPath, stockPlays: nStock, jokers: nJokers };
+            const cand = { moves: nPath, stockPlays: nStock, jokers: nJokers, open: endsOpen(next) };
             if (better(cand)) best = cand;
           }
         }
@@ -194,7 +201,8 @@ AI.Planner = {
     if (chain.stockPlays > 0)   return true;
 
     const humanStock = State.player('human').stock;
-    if (humanStock.length > KI_PLANNER.RISK_OPP_STOCK_LIMIT) return true;
+    const T = AI.taktik();
+    if (!(T && T.RISK_ALWAYS) && humanStock.length > KI_PLANNER.RISK_OPP_STOCK_LIMIT) return true;
     const hTopCard = humanStock[humanStock.length - 1];
     if (!hTopCard) return true;
     const hTop = hTopCard.type === 'joker' ? null : hTopCard.value;
