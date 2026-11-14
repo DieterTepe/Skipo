@@ -5,10 +5,10 @@
 > nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
 **Letzte Aktualisierung:** 14.11.2026 — **Live ist 7.0.2** (`main`). **7.0.3 liegt fertig
-auf dem Zweig `v7.0.3`** und wartet auf Dieters Freigabe: 68,5 % Siegrate gegen 7.0.2,
-92,5 % gegen den einfachen Bot. Offene Entscheidung: faire Stockplanung
-(`PLANNER_FAIR_STOCK`, Abschnitt 6.5). Weil die KI deutlich stärker wird, sind
-Schwierigkeitsstufen der naheliegende nächste Schritt (Abschnitt 8).
+auf dem Zweig `v7.0.3`** und wartet auf Dieters Freigabe: stärkere KI (68,5 % gegen 7.0.2)
+plus Einstellungen **Schwierigkeit** (Leicht / Mittel / Schwer, Standard Schwer) und
+**KI-Planung** (Superstark / Normal, Standard Superstark). Geprüft: Regel-Prüfstand für
+alle sechs Kombinationen, Browsertest (Fenster, Speichern, Sprachen, vier Spiele).
 
 ---
 
@@ -23,6 +23,9 @@ Schwierigkeitsstufen der naheliegende nächste Schritt (Abschnitt 8).
   für die eigene Stockkarte, Sicherheitsabstand 3, Handkarte vor Ablagekarte.
   **68,5 % gegen 7.0.2**, 92,5 % gegen den Bot. Alles Schalter in `ki-taktik.js`; mit den
   dort genannten Altwerten spielt der Code Zug für Zug wie 7.0.2.
+- **Stufen (7.0.3):** `Settings.level` easy / medium / hard und `Settings.planning`
+  super / normal (Store `skipo.v1.level`, `skipo.v1.planning`). `AI.taktik()` legt
+  `KI_STUFEN[level]` über `KI_TAKTIK`; `AI.fairStock()` steuert den Planer. Abschnitt 6.7.
 - **KI (seit 7.0.2):** Blockade-Taktik in `ki-taktik.js` – die KI verweigert Züge, die
   einen Baustapel für die sichtbare Gegner-Stockkarte öffnen, und hebt Joker für
   Planer-Ketten auf. Gemessen: **59 % Siegrate gegen 7.0.1**, 80 % gegen den Bot (7.0.1: 73 %).
@@ -266,8 +269,9 @@ als Schalter gebaut und gemessen. ~75 Messungen, 2000–4000 Paare, `--basis`.
 - **Verdeckte eigene Stockkarten:** Der Planer (`AI.Planner.snapshot/moves`) rechnet seit
   6.6.0 mit allen Karten des eigenen Stockstapels, also auch den verdeckten. Schalter
   `PLANNER_FAIR_STOCK:true` plant nur mit der sichtbaren obersten: kostet 3,5–4 Punkte
-  (65,5 % / 64,5 % statt 68,9 % / 68,1 % gegen 7.0.2; Bot 91,3 %). **Entscheidung offen
-  (Dieter).** Auf Gegnerhand und Nachziehstapel greift die KI nirgends zu (geprüft).
+  (65,5 % / 64,5 % statt 68,9 % / 68,1 % gegen 7.0.2; Bot 91,3 %). **Entschieden
+  (Dieter, 14.11.2026): als Einstellung „KI-Planung" wählbar, Standard Superstark**
+  (Abschnitt 6.7). Auf Gegnerhand und Nachziehstapel greift die KI nirgends zu (geprüft).
 
 **Dieters Hypothese „dem Gegner das Legen verwehren → er zieht weniger nach":** direkt
 gemessen und klar widerlegt. Leerlaufzüge zurückhalten: alle −13, nur Hand −21, nur
@@ -287,10 +291,34 @@ Mit 7.0.3 endet sie in 36 % der Züge mit Joker in der Hand (3+ Joker: 1 %).
 Altwerte im neuen Code = 7.0.2 Zug für Zug (62 322 Züge / 248 Siege identisch).
 Browsertest (Playwright, lokaler Server): komplettes Spiel, 0 Konsolenfehler.
 
+### 6.7 Schwierigkeit und KI-Planung (7.0.3, Einstellungen im Spiel)
+
+| Stufe (`Settings.level`) | Was die KI tut | Technik |
+|---|---|---|
+| **Leicht** `easy` | spielt ohne Blockade (wie 7.0.1) | `AI.taktik()` → `null` |
+| **Mittel** `medium` | blockiert die Gegner-Stockkarte (wie 7.0.2, aber regelkonform: genau eine Ablage) | `KI_TAKTIK` + `KI_STUFEN.medium` |
+| **Schwer** `hard` (Standard) | zusätzlich Joker halten, Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage | `KI_TAKTIK` |
+
+| KI-Planung (`Settings.planning`) | Bedeutung |
+|---|---|
+| **Superstark** `super` (Standard) | Planer rechnet mit den verdeckten Karten des eigenen Stocks (wie seit 6.6.0) |
+| **Normal** `normal` | Planer kennt nur die oberste eigene Stockkarte – wie der Mensch. Gilt in jeder Stufe (`AI.fairStock()`) |
+
+Gemessen (2000 Paare, Seed 1): Mittel gegen altes 7.0.2 **49,6 %** (gleich stark) ·
+Mittel gegen Leicht **58,3 %** · Schwer gegen Mittel **69,8 %** · Schwer gegen Leicht
+**75,3 %** · Normal gegen Superstark: Schwer 45,6 %, Mittel 46,8 %, Leicht 45,8 % ·
+Schwer-Normal gegen Mittel-Superstark **65,6 %**.
+
+Bedienung: Einstellungen (⚙️ → Einstellungen) → zwei Schaltergruppen mit Erklärzeile;
+gilt erst mit „Übernehmen", dann ab dem nächsten KI-Zug (auch mitten im Spiel).
+Der Endscreen zeigt die gespielte Stärke über dem Vergleich. Texte DE/EN/PT
+(`kiLevel_*`, `kiPlan_*`, `kiHintLevel_*`, `kiHintPlan_*`, `kiChanged`).
+Hinweis: Die 10-Spiele-Durchschnitte im Endscreen mischen Spiele verschiedener Stufen.
+Für tune-sim.js erzwingt `KI_TAKTIK.PLANNER_FAIR_STOCK:true` die Planung „Normal".
+
 ### 6.6 Offene KI-Ideen (messbar)
 - Ablage: **welche Karte** behalten wirkt (6.5); **wohin** ablegen bisher nicht.
-- Schwierigkeitsgrade liegen jetzt fertig vor: Leicht = `ENABLED:false` (7.0.1),
-  Mittel = 7.0.2-Werte, Schwer = 7.0.3. Abstände ≈ 59 % und ≈ 68 % je Stufe.
+- Schwierigkeitsstufen sind in 7.0.3 eingebaut (Abschnitt 6.7).
 - Erkenntnis für neue Ideen: Wirkung haben nur echte Entscheidungen (Joker halten,
   Ablage, Quelle, Verweigern). Score-Verschiebungen sortieren nur.
 - Zweite Stockkarte ist nicht sichtbar → keine Taktik darauf (wäre Schummeln).
@@ -318,7 +346,7 @@ Browsertest (Playwright, lokaler Server): komplettes Spiel, 0 Konsolenfehler.
 ## 8. Ideenpool (Reihenfolge = Vorschlag)
 
 1. Soundeffekte (hört auf `move:*` / `pile:cleared` / `game:over`, Aus-Schalter in Settings)
-2. Schwierigkeitsgrade (`KI_TAKTIK.ENABLED` + KONFIG-Sätze, Auswahl in Settings)
+2. ~~Schwierigkeitsgrade~~ – erledigt in 7.0.3 (Abschnitt 6.7)
 3. Spielerstatistik erweitern (Siegesserie, Verlauf; Basis `Tracking.history` liegt schon)
 4. Farbenblind-Modus (CSS-Klasse am body)
 5. Weitere Kartenrückseiten (Design-Bedienfeld)
@@ -350,4 +378,4 @@ Browsertest (Playwright, lokaler Server): komplettes Spiel, 0 Konsolenfehler.
 | 7.0.0 | 16.06.2026 | Aufteilung in HTML + CSS + 7 JS, verhaltensgleich |
 | 7.0.1 | 04.09.2026 | Neuarchitektur (Schichten, Namensräume, Events, I18n-Schlüssel, Store); Äquivalenz bewiesen; live abgenommen |
 | 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Auswertung beider Seiten, tune-sim.js; live, von Dieter ausgiebig getestet (KI-Siegrate ≈ +20 Punkte) |
-| 7.0.3 | 14.11.2026 | Joker am Zugende behalten (behebt Doppelablage), Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. **Zweig `v7.0.3`, nicht freigegeben** |
+| 7.0.3 | 14.11.2026 | Joker am Zugende behalten (behebt Doppelablage), Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. Einstellungen Schwierigkeit (Leicht/Mittel/Schwer) und KI-Planung (Superstark/Normal). **Zweig `v7.0.3`, nicht freigegeben** |

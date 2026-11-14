@@ -660,11 +660,12 @@ html, body {
 /* ============================================================ */
 #overlay-container {
   position:      fixed;
-  top:           20%;
+  top:           10%;
   left:          50%;
   transform:     translateX(-50%);
-  width:         80%;
-  height:        65%;
+  width:         86%;
+  max-width:     520px;
+  height:        80%;
   background:    linear-gradient(to bottom, #000, #777);
   border-radius: 15px;
   z-index:       2000;
@@ -725,8 +726,8 @@ html, body {
   top:           80px;
   left:          50%;
   transform:     translateX(-50%);
-  width:         70%;
-  bottom:        90px;
+  width:         84%;
+  bottom:        246px;       /* 7.0.3: Platz für KI-Auswahl + Tempo */
   background:    #eee;
   color:         black;
   overflow-y:    auto;
@@ -736,6 +737,62 @@ html, body {
 #overlay-info h1, #overlay-info h2, #overlay-info h3 { color: darkred; }
 #overlay-info p   { color: black; margin-bottom: 10px; }
 #overlay-info li  { color: blue; }
+/* 7.0.3 – KI-Schwierigkeit + KI-Planung (Schaltergruppen) */
+.ki-control-container {
+  position:       absolute;
+  bottom:         84px;
+  left:           5%;
+  right:          5%;
+  display:        flex;
+  flex-direction: column;
+  gap:            8px;
+  padding:        10px;
+  background:     rgba(0, 0, 0, 0.3);
+  border-radius:  8px;
+}
+.ki-row {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+}
+.ki-label {
+  flex:       0 0 34%;
+  font-size:  0.9rem;
+  color:      #fff;
+  text-align: left;
+}
+.ki-seg {
+  flex:          1;
+  display:       flex;
+  border-radius: 8px;
+  overflow:      hidden;
+  border:        1px solid rgba(255, 255, 255, 0.35);
+}
+.ki-seg button {
+  flex:        1;
+  min-height:  36px;
+  padding:     6px 4px;
+  font-size:   0.85rem;
+  color:       #fff;
+  background:  rgba(255, 255, 255, 0.10);
+  border:      none;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  cursor:      pointer;
+}
+.ki-seg button:first-child { border-left: none; }
+.ki-seg button.active {
+  /* Weiß/Schwarz: bleibt lesbar, auch wenn der Farbwechsel des Fensters (hue-rotate) läuft */
+  background:  #ffffff;
+  color:       #111111;
+  font-weight: 700;
+}
+.ki-seg button:focus-visible { outline: 2px solid #ffffff; outline-offset: -3px; }
+.ki-hint {
+  min-height:  2.5em;
+  font-size:   0.78rem;
+  line-height: 1.25;
+  color:       #f0f0f0;
+}
 .speed-control-container {
   position:      absolute;
   bottom:        20px;
@@ -930,6 +987,12 @@ html, body {
 /* 7.0.2 – VERGLEICH BEIDER SEITEN IM ENDSCREEN                 */
 /* ============================================================ */
 .cmp-box   { text-align: left; font-size: 0.5em; font-weight: normal; line-height: 1.5; margin-bottom: 14px; }
+.cmp-level {
+  margin:      0 0 8px;
+  font-size:   0.85rem;
+  text-align:  center;
+  color:       #cfd8dc;
+}
 .cmp-title { color: #ffd700; font-weight: bold; margin: 8px 0 4px; text-align: center; }
 .cmp-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; }
 .cmp-table th, .cmp-table td { padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }

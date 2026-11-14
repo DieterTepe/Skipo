@@ -28,9 +28,24 @@ const AI = {
     return State.turn.over || Rules.winner() !== null;
   },
 
-  /** Blockade-Taktik (ki-taktik.js) aktiv? → Objekt, sonst null. */
+  /**
+   * Taktik-Werte für die gewählte Schwierigkeit (Settings.level) → Objekt, sonst null.
+   *   hard   = KI_TAKTIK            medium = KI_TAKTIK + KI_STUFEN.medium
+   *   easy   = null (Taktik aus)    ENABLED:false in der Datei schaltet immer aus
+   */
   taktik() {
-    return (typeof KI_TAKTIK !== 'undefined' && KI_TAKTIK && KI_TAKTIK.ENABLED) ? KI_TAKTIK : null;
+    if (typeof KI_TAKTIK === 'undefined' || !KI_TAKTIK || !KI_TAKTIK.ENABLED) return null;
+    const level = (typeof Settings !== 'undefined' && Settings.level) || 'hard';
+    const over  = (level !== 'hard' && typeof KI_STUFEN !== 'undefined') ? KI_STUFEN[level] : null;
+    if (!over) return KI_TAKTIK;
+    if (over.ENABLED === false) return null;
+    return Object.assign({}, KI_TAKTIK, over);
+  },
+
+  /** KI-Planung „Normal": Planer sieht nur die oberste eigene Stockkarte (gilt in jeder Stufe). */
+  fairStock() {
+    if (typeof KI_TAKTIK !== 'undefined' && KI_TAKTIK && KI_TAKTIK.PLANNER_FAIR_STOCK) return true;
+    return typeof Settings !== 'undefined' && Settings.planning === 'normal';
   },
 
   /** Statusmeldung (Schlüssel + Werte). */

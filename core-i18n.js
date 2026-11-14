@@ -81,6 +81,20 @@ const I18n = {
     btnClose:     { de:'Schließen', en:'Close', pt:'Fechar' },
     phName:       { de:'Spielername', en:'Player name', pt:'Nome do jogador' },
     speedLabel:   { de:'Geschwindigkeit (0–20s)', en:'Speed (0–20s)', pt:'Velocidade (0–20s)' },
+    // 7.0.3: KI-Schwierigkeit + KI-Planung
+    kiLevelLabel: { de:'Schwierigkeit', en:'Difficulty', pt:'Dificuldade' },
+    kiLevel_easy: { de:'Leicht', en:'Easy', pt:'Fácil' },
+    kiLevel_medium:{ de:'Mittel', en:'Medium', pt:'Médio' },
+    kiLevel_hard: { de:'Schwer', en:'Hard', pt:'Difícil' },
+    kiPlanLabel:  { de:'KI-Planung', en:'AI planning', pt:'Planeamento da IA' },
+    kiPlan_super: { de:'Superstark', en:'Super strong', pt:'Superforte' },
+    kiPlan_normal:{ de:'Normal', en:'Normal', pt:'Normal' },
+    kiHintLevel_easy:  { de:'Leicht: Die KI spielt ohne Blockade.', en:'Easy: the AI plays without blocking.', pt:'Fácil: a IA joga sem bloquear.' },
+    kiHintLevel_medium:{ de:'Mittel: Die KI blockiert deine Stockkarte.', en:'Medium: the AI blocks your stock card.', pt:'Médio: a IA bloqueia a tua carta de reserva.' },
+    kiHintLevel_hard:  { de:'Schwer: Die KI blockiert, spart Joker und legt klug ab.', en:'Hard: the AI blocks, saves jokers and discards wisely.', pt:'Difícil: a IA bloqueia, poupa coringas e descarta com cuidado.' },
+    kiHintPlan_super:  { de:'Superstark: Sie plant mit den verdeckten Karten ihres eigenen Stocks.', en:'Super strong: it plans with the face-down cards of its own stock.', pt:'Superforte: planeia com as cartas viradas para baixo da sua própria reserva.' },
+    kiHintPlan_normal: { de:'Normal: Sie kennt nur ihre oberste Stockkarte – wie du.', en:'Normal: it only knows its top stock card – just like you.', pt:'Normal: só conhece a carta de cima da sua reserva – tal como tu.' },
+    kiChanged:    { de:'🤖 KI-Stärke: {0} · {1}', en:'🤖 AI strength: {0} · {1}', pt:'🤖 Força da IA: {0} · {1}' },
 
     // ── Bestätigungen ──
     confirmNewGame:    { de:'Neues Spiel starten? Das aktuelle Spiel wird beendet.',

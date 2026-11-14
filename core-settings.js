@@ -1,11 +1,12 @@
 // ================================================================
-//  core-settings.js  –  Skipo 7.0.1   Namensräume: Settings, Clock
+//  core-settings.js  –  Skipo 7.0.3   Namensräume: Settings, Clock
 //  PERSISTENTE EINSTELLUNGEN + PAUSENUHR
 // ----------------------------------------------------------------
 //  Braucht: Store, Events     Bietet: Settings.*, Clock.pause/after
 //
 //  Settings hält alles, was der Spieler einstellt und was den
-//  Neustart überlebt: Name, Sprache, Tempo, Hintergrund.
+//  Neustart überlebt: Name, Sprache, Tempo, Hintergrund und (7.0.3)
+//  KI-Schwierigkeit + KI-Planung.
 //  Änderungen laufen über Settings.set() → gespeichert + Ereignis
 //  "settings:change", damit die Anzeige reagieren kann.
 //
@@ -21,8 +22,13 @@ const Settings = {
     lang:    'de',
     speed:   4,                          // Sekunden je Pauseneinheit (0–20)
     bg:      { h: 130, s: 60, l: 19 },   // bisheriges Grün (#1B5E20)
-    nameSet: false                       // false → Einstellungen beim ersten Start zeigen
+    nameSet: false,                      // false → Einstellungen beim ersten Start zeigen
+    level:    'hard',                    // KI-Schwierigkeit: 'easy' | 'medium' | 'hard'   (7.0.3)
+    planning: 'super'                    // KI-Planung: 'super' (mit verdeckten eigenen Stockkarten) | 'normal'
   },
+
+  LEVELS:    ['easy', 'medium', 'hard'],
+  PLANNINGS: ['super', 'normal'],
 
   /** Vorgefertigte Hintergrund-Themen (Farbton/Sättigung/Helligkeit). */
   THEMES: [
@@ -39,6 +45,8 @@ const Settings = {
   speed:   4,
   bg:      { h: 130, s: 60, l: 19 },
   nameSet: false,
+  level:    'hard',
+  planning: 'super',
 
   /** Beim Start: Altwerte übernehmen, dann alle Werte laden und prüfen. */
   load() {
@@ -60,6 +68,12 @@ const Settings = {
       : { ...D.bg };
 
     this.nameSet = Store.get('nameSet', D.nameSet) === true;
+
+    const level = Store.get('level', D.level);
+    this.level = this.LEVELS.includes(level) ? level : D.level;
+
+    const planning = Store.get('planning', D.planning);
+    this.planning = this.PLANNINGS.includes(planning) ? planning : D.planning;
   },
 
   /** Wert setzen, speichern, Ereignis senden. */

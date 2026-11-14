@@ -11,6 +11,13 @@
 //    gegen einfachen Bot  92,5 %           (7.0.2: 81,8 %)
 //  Einzelmessungen: Projekt.md, Abschnitt 6.
 //
+//  SCHWIERIGKEIT (Einstellungen im Spiel, Settings.level):
+//    'hard'   = die Werte unten (7.0.3)            – Standard
+//    'medium' = KI_STUFEN.medium darübergelegt    – Stärke wie 7.0.2
+//    'easy'   = Taktik aus                        – Stärke wie 7.0.1
+//  KI-PLANUNG (Settings.planning): 'super' = Planer nutzt die verdeckten
+//    eigenen Stockkarten (Standard), 'normal' = nur die sichtbare oberste.
+//
 //  Rückfall ohne Datei-Tausch:
 //    ENABLED: false ............... KI spielt exakt wie 7.0.1/7.0.0
 //    Block „NEU IN 7.0.3" auf die  KI spielt exakt wie 7.0.2
@@ -57,10 +64,12 @@ let KI_TAKTIK = {
   //    spielen (mehr Nachziehen). '' = aus.
   PREFER_SRC:            'hand',    // ('')
 
-  // ── FAIRNESS-SCHALTER (Entscheidung offen) ────────────────────
+  // ── KI-PLANUNG ────────────────────────────────────────────────
   // Der Zugketten-Planer rechnet seit 6.6.0 mit den VERDECKTEN Karten des
-  // eigenen Stockstapels. true = nur die sichtbare oberste Stockkarte.
-  // Kostet 3,5–4 Punkte (65 % statt 68,5 % gegen 7.0.2).
+  // eigenen Stockstapels („Superstark"). „Normal" = nur die sichtbare oberste
+  // Stockkarte; kostet 3,5–4 Punkte (65 % statt 68,5 % gegen 7.0.2).
+  // Gewählt wird im Spiel (Einstellungen → KI-Planung). true hier erzwingt
+  // „Normal" unabhängig von der Einstellung (für Messungen mit tune-sim.js).
   PLANNER_FAIR_STOCK:    false,
 
   // ── GEMESSEN, OHNE GEWINN (aus/0; für spätere Versuche) ───────
@@ -111,4 +120,15 @@ let KI_TAKTIK = {
   PLANNER_AVOID_OPEN:    false,   // Ketten meiden, die offen enden (±0)
   RISK_ALWAYS:           false,   // Risikoprüfung unabhängig vom Gegner-Stock (±0)
   CONTINUE_AFTER_FALLBACK: false  // nach Stock-Fallback weiterspielen
+};
+
+// ── SCHWIERIGKEITSSTUFEN (7.0.3) ────────────────────────────────
+// Werte, die für eine Stufe ÜBER KI_TAKTIK gelegt werden (AI.taktik()).
+// 'medium' entspricht 7.0.2, aber regelkonform: JOKER_END 'single' =
+// genau eine Ablage je Zug (gemessen: 49,6 % gegen das alte 7.0.2).
+const KI_STUFEN = {
+  easy:   { ENABLED: false },
+  medium: { JOKER_END: 'single', JOKER_END_DIRECT: true, AVOID_DIST: 1,
+            DISC_KEEP_USEFUL: 0, DISC_DUP: 0, PREFER_SRC: '' },
+  hard:   {}
 };

@@ -33,7 +33,7 @@ AI.Planner = {
     const hand      = ai.hand.map(c => c.type === 'joker' ? 0 : c.value);
     const discs     = ai.discards.map(pile => pile.map(c => c.type === 'joker' ? 0 : c.value));
     const stockVals = ai.stock.map(c => c.type === 'joker' ? 0 : c.value);
-    return { builds, hand, discs, stockLen: stockVals.length, stockVals, stockLen0: stockVals.length };
+    return { builds, hand, discs, stockLen: stockVals.length, stockVals, stockLen0: stockVals.length, fair: AI.fairStock() };
   },
 
   /** Schlüssel für den Besucht-Speicher. */
@@ -49,11 +49,9 @@ AI.Planner = {
     const moves  = [];
     const needed = st.builds.map(b => b + 1);
 
-    // 1. Stockkarte (7.0.3 PLANNER_FAIR_STOCK: nur die sichtbare oberste – die Karten darunter
-    //    liegen verdeckt und dürfen nicht in die Planung eingehen)
-    const T = AI.taktik();
-    const fair = !!(T && T.PLANNER_FAIR_STOCK);
-    if (st.stockLen > 0 && (!fair || st.stockLen === st.stockLen0)) {
+    // 1. Stockkarte (7.0.3, KI-Planung „Normal": nur die sichtbare oberste – die Karten
+    //    darunter liegen verdeckt und gehen dann nicht in die Planung ein)
+    if (st.stockLen > 0 && (!st.fair || st.stockLen === st.stockLen0)) {
       const top = st.stockVals[st.stockLen - 1];
       for (let p = 0; p < 4; p++) {
         if (top === needed[p]) {
@@ -113,7 +111,8 @@ AI.Planner = {
       discs:     st.discs,
       stockLen:  st.stockLen,
       stockVals: st.stockVals,
-      stockLen0: st.stockLen0
+      stockLen0: st.stockLen0,
+      fair:      st.fair
     };
     next.builds[mv.pile] = next.builds[mv.pile] + 1;
     if (next.builds[mv.pile] === 12) next.builds[mv.pile] = 0;

@@ -26,6 +26,12 @@ const Overlays = {
       ov.querySelector('#input-name').placeholder      = I18n.t('phName');
       ov.querySelector('.speed-label').textContent     = I18n.t('speedLabel');
       ov.querySelector('#overlay-info').innerHTML      = I18n.t('rulesHtml');
+      // 7.0.3: KI-Schwierigkeit + KI-Planung
+      ov.querySelector('#ki-level-label').textContent  = I18n.t('kiLevelLabel');
+      ov.querySelector('#ki-plan-label').textContent   = I18n.t('kiPlanLabel');
+      ov.querySelectorAll('#ki-level button').forEach(b => { b.textContent = I18n.t('kiLevel_' + b.dataset.v); });
+      ov.querySelectorAll('#ki-plan button').forEach(b => { b.textContent = I18n.t('kiPlan_' + b.dataset.v); });
+      this.kiHint();
     }
     const dv = document.getElementById('design-overlay');
     if (dv) {
@@ -42,7 +48,7 @@ const Overlays = {
   },
 
   // ----------------------------------------------------------------
-  // EINSTELLUNGEN (Name, Tempo, Spielregeln)
+  // EINSTELLUNGEN (Name, Tempo, Spielregeln, KI-Schwierigkeit, KI-Planung)
   // ----------------------------------------------------------------
 
   showSettings() {
@@ -57,6 +63,24 @@ const Overlays = {
         <button id="btn-schliessen"></button>
       </div>
       <div id="overlay-info"></div>
+      <div class="ki-control-container">
+        <div class="ki-row">
+          <span class="ki-label" id="ki-level-label"></span>
+          <div class="ki-seg" id="ki-level" role="group">
+            <button type="button" data-v="easy"></button>
+            <button type="button" data-v="medium"></button>
+            <button type="button" data-v="hard"></button>
+          </div>
+        </div>
+        <div class="ki-row">
+          <span class="ki-label" id="ki-plan-label"></span>
+          <div class="ki-seg" id="ki-plan" role="group">
+            <button type="button" data-v="super"></button>
+            <button type="button" data-v="normal"></button>
+          </div>
+        </div>
+        <div class="ki-hint" id="ki-hint"></div>
+      </div>
       <div class="speed-control-container">
         <span class="speed-label"></span>
         <input type="range" class="speed-slider" id="speed-slider" min="0" max="20" step="1">
@@ -72,8 +96,20 @@ const Overlays = {
         }
         Settings.set('speed', parseInt(ov.querySelector('#speed-slider').value, 10));
         Settings.set('nameSet', true);
+        // 7.0.3: KI-Schwierigkeit + KI-Planung (gilt ab dem nächsten KI-Zug)
+        const level = this.kiChoice('ki-level'), plan = this.kiChoice('ki-plan');
+        if (level !== Settings.level || plan !== Settings.planning) {
+          Settings.set('level', level);
+          Settings.set('planning', plan);
+          I18n.say('kiChanged', I18n.t('kiLevel_' + level), I18n.t('kiPlan_' + plan));
+        }
         this.hideSettings();
       });
+      ov.querySelectorAll('.ki-seg').forEach(seg => seg.addEventListener('click', e => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        this.kiSelect(seg.id, b.dataset.v);
+      }));
       ov.querySelector('#speed-slider').addEventListener('input', e => {
         ov.querySelector('#speed-value').textContent = `${e.target.value}s`;
       });
@@ -83,7 +119,36 @@ const Overlays = {
     ov.querySelector('#input-name').value        = Settings.name;
     ov.querySelector('#speed-slider').value      = Settings.speed;
     ov.querySelector('#speed-value').textContent = `${Settings.speed}s`;
+    this.kiSelect('ki-level', Settings.level);
+    this.kiSelect('ki-plan',  Settings.planning);
     ov.style.display = 'block';
+  },
+
+  /** Auswahl in einer Schaltergruppe markieren (noch nicht gespeichert – erst „Übernehmen"). */
+  kiSelect(groupId, value) {
+    const seg = document.getElementById(groupId);
+    if (!seg) return;
+    seg.querySelectorAll('button').forEach(b => {
+      const on = b.dataset.v === value;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    this.kiHint();
+  },
+
+  /** Aktuell markierter Wert einer Schaltergruppe. */
+  kiChoice(groupId) {
+    const b = document.querySelector('#' + groupId + ' button.active');
+    return b ? b.dataset.v : null;
+  },
+
+  /** Erklärzeile unter der KI-Auswahl. */
+  kiHint() {
+    const el = document.getElementById('ki-hint');
+    if (!el) return;
+    const level = this.kiChoice('ki-level') || Settings.level;
+    const plan  = this.kiChoice('ki-plan')  || Settings.planning;
+    el.textContent = I18n.t('kiHintLevel_' + level) + ' ' + I18n.t('kiHintPlan_' + plan);
   },
 
   hideSettings() {
@@ -268,7 +333,8 @@ const Overlays = {
     if (g.human.missed > 0) tips += `<div class="cmp-tip">${I18n.t('tipMissed', g.human.missed)}</div>`;
     if (g.human.opened > 0) tips += `<div class="cmp-tip">${I18n.t('tipOpened', g.human.opened)}</div>`;
     if (!tips) tips = `<div class="cmp-tip">${I18n.t('tipGood')}</div>`;
-    let html = `<div class="cmp-box">${table(g.human, g.ai, I18n.t('cmpTitle'))}${tips}`;
+    const strength = `<div class="cmp-level">${I18n.t('kiChanged', I18n.t('kiLevel_' + Settings.level), I18n.t('kiPlan_' + Settings.planning))}</div>`;
+    let html = `<div class="cmp-box">${strength}${table(g.human, g.ai, I18n.t('cmpTitle'))}${tips}`;
     if (avg.games >= 2) {
       const winsRow = `<tr><td>${I18n.t('cmpWins')}</td><td>${avg.human.wins}</td><td>${avg.ai.wins}</td></tr>`;
       html += table(avg.human, avg.ai, I18n.t('cmpAvgTitle', avg.games), winsRow);
