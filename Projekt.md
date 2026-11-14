@@ -1,25 +1,26 @@
-# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.3 (Zweig, noch nicht freigegeben)
+# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.3
 
 > **Zweck dieser Datei:** Übergabe-Dokument. Wer einen neuen Chat startet, liest
 > zuerst diese Datei und weiß sofort, was Stand, Regeln, Entscheidungen und
 > nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
-**Letzte Aktualisierung:** 14.11.2026 — **Live ist 7.0.2** (`main`). **7.0.3 liegt fertig
-auf dem Zweig `v7.0.3`** und wartet auf Dieters Freigabe: stärkere KI (68,5 % gegen 7.0.2)
-plus Einstellungen **Schwierigkeit** (Leicht / Mittel / Schwer, Standard Schwer) und
-**KI-Planung** (Superstark / Normal, Standard Superstark). Geprüft: Regel-Prüfstand für
-alle sechs Kombinationen, Browsertest (Fenster, Speichern, Sprachen, vier Spiele).
+**Letzte Aktualisierung:** 14.11.2026 — **7.0.3 ist live** (von Dieter freigegeben, `main`).
+Stärkere KI (68,5 % gegen 7.0.2) plus Einstellungen **Schwierigkeit** (Leicht / Mittel /
+Schwer, Standard Schwer) und **KI-Planung** (Superstark / Normal, Standard Superstark).
+Vor der Freigabe geprüft: Regel-Prüfstand für alle sechs Kombinationen, Browsertest
+(Fenster, Speichern, Sprachen, vier Spiele). Dieters Live-Test steht noch aus.
 
 ---
 
 ## 0. Kurzfassung für den schnellen Einstieg
 
-- **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_2.html` – GitHub Pages,
-  Repo `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.2`.
+- **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_3.html` – GitHub Pages,
+  Repo `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.3`.
+  Achtung: `SkipBo_7_0_2.html` lädt dieselben JS-Dateien und spielt deshalb ebenfalls 7.0.3.
 - **Architektur (seit 7.0.1):** vier Schichten (core → ai → flow/tracking → ui), ein
   Namensraum je Datei, Ereignisbus, Meldungsschlüssel (DE/EN/PT), ein Speicher-Zugang.
   Kein DOM in core/ai/flow/tracking → alles läuft in Node und ist simulierbar.
-- **KI 7.0.3 (Zweig `v7.0.3`):** Joker bleiben am Zugende in der Hand, Ablage behält Karten
+- **KI 7.0.3:** Joker bleiben am Zugende in der Hand, Ablage behält Karten
   für die eigene Stockkarte, Sicherheitsabstand 3, Handkarte vor Ablagekarte.
   **68,5 % gegen 7.0.2**, 92,5 % gegen den Bot. Alles Schalter in `ki-taktik.js`; mit den
   dort genannten Altwerten spielt der Code Zug für Zug wie 7.0.2.
@@ -96,8 +97,8 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 ├── test-sim.js          Invarianten + Äquivalenz gegen 7.0.0 (Abschnitt 5)
 ├── tune-sim.js          KI gegen KI: Konfigurationsvergleich, Sweep, Bot (Abschnitt 6)
 │
-├── SkipBo_7_0_3.html    (Zweig v7.0.3) wie 7_0_2, alle ?v=7.0.3
-├── SkipBo_7_0_2.html    DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
+├── SkipBo_7_0_3.html    DOM-Gerüst (aktuell), alle ?v=7.0.3
+├── SkipBo_7_0_2.html    alte Einstiegsseite, DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
 ├── style.css            CSS (Karten, Felder, Menü, Overlays, Endscreen, Vergleichstabelle)
 ├── impressum.html / datenschutz.html   „Zurück"-Link auf SkipBo_7_0_2.html
 ├── Projekt.md           diese Datei
@@ -378,4 +379,4 @@ Für tune-sim.js erzwingt `KI_TAKTIK.PLANNER_FAIR_STOCK:true` die Planung „Nor
 | 7.0.0 | 16.06.2026 | Aufteilung in HTML + CSS + 7 JS, verhaltensgleich |
 | 7.0.1 | 04.09.2026 | Neuarchitektur (Schichten, Namensräume, Events, I18n-Schlüssel, Store); Äquivalenz bewiesen; live abgenommen |
 | 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Auswertung beider Seiten, tune-sim.js; live, von Dieter ausgiebig getestet (KI-Siegrate ≈ +20 Punkte) |
-| 7.0.3 | 14.11.2026 | Joker am Zugende behalten (behebt Doppelablage), Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. Einstellungen Schwierigkeit (Leicht/Mittel/Schwer) und KI-Planung (Superstark/Normal). **Zweig `v7.0.3`, nicht freigegeben** |
+| 7.0.3 | 14.11.2026 | Joker am Zugende behalten (behebt Doppelablage), Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. Einstellungen Schwierigkeit (Leicht/Mittel/Schwer) und KI-Planung (Superstark/Normal). Live seit 14.11.2026 (Freigabe Dieter) |
