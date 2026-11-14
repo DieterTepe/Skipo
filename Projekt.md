@@ -16,7 +16,8 @@ Vor der Freigabe geprüft: Regel-Prüfstand für alle sechs Kombinationen, Brows
 
 - **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_3.html` – GitHub Pages,
   Repo `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.3`.
-  `SkipBo_7_0_2.html` ist seit 14.11.2026 nur noch eine Weiterleitung auf die aktuelle Startseite.
+  `SkipBo_7_0_2.html` und `SkipBo_7_0_1.html` sind seit 14.11.2026 nur noch Weiterleitungen
+  auf die aktuelle Startseite.
 - **Architektur (seit 7.0.1):** vier Schichten (core → ai → flow/tracking → ui), ein
   Namensraum je Datei, Ereignisbus, Meldungsschlüssel (DE/EN/PT), ein Speicher-Zugang.
   Kein DOM in core/ai/flow/tracking → alles läuft in Node und ist simulierbar.
@@ -37,8 +38,7 @@ Vor der Freigabe geprüft: Regel-Prüfstand für alle sechs Kombinationen, Brows
   und `tune-sim.js` (KI stärker? KI gegen KI, gepaarte Spiele). Nach jeder Änderung laufen lassen.
 - **Referenzen bleiben im Repo:** 6.6.0 (`SkipBo_6_6_0.html`) und 7.0.0
   (`SkipBo_7_0_0.html` + state/engine/view/ai/endgame.js). Die 7.0.0-JS-Dateien braucht
-  `test-sim.js` – nicht löschen. `SkipBo_7_0_1.html` ist entbehrlich (lädt dieselben
-  JS-Dateien, wäre „7.0.2 ohne Taktik").
+  `test-sim.js` – nicht löschen. `SkipBo_7_0_1.html` und `SkipBo_7_0_2.html` sind Weiterleitungen (siehe oben).
 - Sprachen: DE, EN, PT. Ukrainisch entfallen (04.09.2026).
 
 ---
