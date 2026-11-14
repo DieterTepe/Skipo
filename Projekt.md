@@ -16,7 +16,7 @@ Vor der Freigabe geprüft: Regel-Prüfstand für alle sechs Kombinationen, Brows
 
 - **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_3.html` – GitHub Pages,
   Repo `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.3`.
-  Achtung: `SkipBo_7_0_2.html` lädt dieselben JS-Dateien und spielt deshalb ebenfalls 7.0.3.
+  `SkipBo_7_0_2.html` ist seit 14.11.2026 nur noch eine Weiterleitung auf die aktuelle Startseite.
 - **Architektur (seit 7.0.1):** vier Schichten (core → ai → flow/tracking → ui), ein
   Namensraum je Datei, Ereignisbus, Meldungsschlüssel (DE/EN/PT), ein Speicher-Zugang.
   Kein DOM in core/ai/flow/tracking → alles läuft in Node und ist simulierbar.
@@ -98,7 +98,8 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 ├── tune-sim.js          KI gegen KI: Konfigurationsvergleich, Sweep, Bot (Abschnitt 6)
 │
 ├── SkipBo_7_0_3.html    DOM-Gerüst (aktuell), alle ?v=7.0.3
-├── SkipBo_7_0_2.html    alte Einstiegsseite, DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
+├── SkipBo_7_0_2.html    Weiterleitung auf SkipBo_7_0_3.html (meta refresh + location.replace + Link)
+│                        ursprünglich: DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
 ├── style.css            CSS (Karten, Felder, Menü, Overlays, Endscreen, Vergleichstabelle)
 ├── impressum.html / datenschutz.html   „Zurück"-Link auf SkipBo_7_0_2.html
 ├── Projekt.md           diese Datei
@@ -135,7 +136,7 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 | **KI-Änderung** | Schalter/Wert in `ki-taktik.js` → Code in `ai-*.js` hinter `AI.taktik()` → `node tune-sim.js --games=1000 T:SCHALTER=true` → übernehmen nur bei > 53 % (±2) → `node test-sim.js 300 42` muss weiterhin „identisch" melden (Taktik AUS) |
 | Neues Overlay | `ui-overlays.js` Methode + CSS-Klassen in `style.css` (keine Inline-Styles) |
 | Sound / Statistik / Schwierigkeitsgrad | neue Datei, hört auf `move:*`, `game:over`, `turn:change`; Init in `app.js` |
-| Release | alle `?v=7.0.2` in der HTML gemeinsam hochzählen; neue Version = neue HTML-Datei |
+| Release | alle `?v=` in der HTML gemeinsam hochzählen; neue Version = neue HTML-Datei; die bisherige Startdatei durch eine Weiterleitung ersetzen (Vorlage: `SkipBo_7_0_2.html`), weil alte HTML-Dateien dieselben JS-Dateien laden und sonst die neue KI mit altem Titel zeigen |
 
 ---
 
