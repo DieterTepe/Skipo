@@ -13,6 +13,7 @@
 //    node tune-sim.js --games=500 --taktik KEY=WERT ...         KI_TAKTIK-Werte für B (A: KI_TAKTIK aus)
 //    node tune-sim.js --games=500 --a=konfigA.json --b=konfigB.json
 //    node tune-sim.js --games=500 --bot                         Herausforderer gegen einfachen Bot
+//    Zusatz --basis: A = aktuelle KI_TAKTIK-Standardwerte (statt Taktik aus) → B misst nur den neuen Schalter
 //
 //  Ausgabe: Siegrate von B mit 95-%-Intervall, Stockdifferenz,
 //  Züge, Dauer. Sweep-Ergebnisse werden fortlaufend in
@@ -170,8 +171,10 @@ function fmt(r) {
   const ctx  = makeEngine();
   const base = ctx.__baseKonfig;
   const baseT = ctx.__baseTaktik;
-  const cfgA = opt('a') ? { konfig: loadJson(opt('a')).konfig || loadJson(opt('a')), taktik: baseT && loadJson(opt('a')).taktik || (baseT ? { ...baseT, ENABLED: false } : null) }
-                        : { konfig: base, taktik: baseT ? { ...baseT, ENABLED: false } : null };
+  // --basis: A = aktuelle KI_TAKTIK-Standardwerte (z. B. 7.0.2 mit Blockade), sonst A = Taktik aus (7.0.1)
+  const aTaktik = baseT ? (args.includes('--basis') ? { ...baseT } : { ...baseT, ENABLED: false }) : null;
+  const cfgA = opt('a') ? { konfig: loadJson(opt('a')).konfig || loadJson(opt('a')), taktik: baseT && loadJson(opt('a')).taktik || aTaktik }
+                        : { konfig: base, taktik: aTaktik };
   const useBot = args.includes('--bot');
 
   if (args.includes('--sweep')) {

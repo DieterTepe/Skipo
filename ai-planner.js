@@ -144,11 +144,13 @@ AI.Planner = {
     const th = (T && T.PLANNER_AVOID_OPEN) ? AI.Analysis.threat() : null;
     const V  = th ? th.value : null;
     const endsOpen = st => V !== null && st.builds.some(b => b + 1 === V);
+    const preferClear = !!(T && T.PLANNER_PREFER_CLEAR && goal === 'stock');   // 7.0.3
 
     function better(cand) {
       if (!best) return true;
       if (cand.stockPlays !== best.stockPlays) return cand.stockPlays > best.stockPlays;
       if (V !== null && cand.open !== best.open) return !cand.open;
+      if (preferClear && !!cand.clears !== !!best.clears) return !!cand.clears;
       if (cand.jokers     !== best.jokers)     return cand.jokers     < best.jokers;
       return cand.moves.length < best.moves.length;
     }
@@ -178,6 +180,11 @@ AI.Planner = {
             const cutJok = cut.reduce((s, m) => s + (m.isJoker ? 1 : 0), 0);
             const cand   = { moves: cut, stockPlays: nStock, jokers: cutJok, open: endsOpen(next) };
             if (better(cand)) best = cand;
+            // 7.0.3: Stockkette über die letzte Stockkarte hinaus verlängert, bis die Hand leer ist
+            if (preferClear && next.hand.length === 0 && nPath.length > nLastSt) {
+              const cand2 = { moves: nPath, stockPlays: nStock, jokers: nJokers, open: endsOpen(next), clears: true };
+              if (better(cand2)) best = cand2;
+            }
           }
         } else {
           if (next.hand.length === 0) {

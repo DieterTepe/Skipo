@@ -211,6 +211,7 @@ AI.Eval = {
       if (candidates.length === 0) return [];
     }
     if (T) this.applyThreat(candidates, T);
+    if (T && T.CHAIN_AVOID) this.applyChain(candidates, T);
 
     const avgScore         = candidates.reduce((s, m) => s + m.score, 0) / candidates.length;
     const dynamicThreshold = avgScore * nagel40;
@@ -296,6 +297,36 @@ AI.Eval = {
       } else if (T.AVOID_DISCARD_TOPS && m.sourceType !== 'stock' && th.tops.includes(eff + 1)) {
         m.avoid = true;
       }
+    }
+  },
+
+  /**
+   * Kettenbedrohung (7.0.3): Zug verweigern, wenn der Gegner danach mit seinen
+   * sichtbaren Karten eine Kette legen kann, die ohne den Zug nicht möglich wäre.
+   *   CHAIN_STOCK : Stockkarte des Gegners wird erst durch den Zug erreichbar
+   *   CHAIN_LIMIT : Kette ≥ Grenze UND um ≥ CHAIN_DELTA länger als vorher (0 = aus)
+   */
+  applyChain(candidates, T) {
+    const human = State.player('human');
+    if (human.stock.length > T.CHAIN_OPP_STOCK_LIMIT) return;
+    const me   = State.player('ai');
+    const base = AI.Analysis.chainThreat(AI.Analysis.buildNeeds());
+    for (const m of candidates) {
+      if (m.avoid) continue;
+      if (T.CHAIN_SKIP_STOCKMOVE && m.sourceType === 'stock') continue;
+      const pile = State.game.buildPiles[m.buildPileIndex];
+      const eff  = m.card.type === 'joker' ? Rules.nextNeeded(pile) : parseInt(m.card.value, 10);
+      const aft  = AI.Analysis.chainThreat(AI.Analysis.buildNeeds(m.buildPileIndex, eff));
+      let bad = false;
+      if (T.CHAIN_STOCK && aft.reach && !base.reach) bad = true;
+      if (T.CHAIN_LIMIT > 0 && aft.count >= T.CHAIN_LIMIT && aft.count - base.count >= T.CHAIN_DELTA) bad = true;
+      if (bad && T.CHAIN_ALLOW_COVER) {
+        // eigene Deckkarte (passend zur Stockkarte des Gegners) vorhanden → trotzdem spielen
+        const sTop = human.stock[human.stock.length - 1];
+        const V = sTop && sTop.type !== 'joker' ? parseInt(sTop.value, 10) : -1;
+        if (V > 0 && me.hand.some(c => c.type === 'joker' || parseInt(c.value, 10) === V)) bad = false;
+      }
+      if (bad) m.avoid = true;
     }
   },
 

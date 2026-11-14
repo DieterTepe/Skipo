@@ -496,8 +496,18 @@ const AI = {
           if (human.stock.length < 5) score -= KONFIG.SCORE_20;
         }
 
+        // 7.0.3: Serienstapel – größere Karte auf kleinere verdeckt die kleinere (bricht die Serie)
+        const T = AI.taktik();
+        if (T && T.SERIES_BREAK_PENALTY > 0 && topCard && topCard.type !== 'joker' &&
+            cardToPlay.type !== 'joker' && cardToPlay.value > topCard.value) {
+          score -= T.SERIES_BREAK_PENALTY * Math.min(pile.length, T.SERIES_LEN_CAP);
+        }
+
         const jokerProtect = AI.Analysis.jokerProtectDiscard(i);
-        if (jokerProtect.protect) score -= jokerProtect.penalty;
+        if (jokerProtect.protect) {
+          if (T && T.JOKER_STACK && cardToPlay.type === 'joker') { /* Joker auf Joker: bleibt griffbereit, kein Abzug */ }
+          else score -= (T && T.JOKER_HARD) ? 1000000 : jokerProtect.penalty;
+        }
 
         if (score > bestScore) {
           bestScore        = score;

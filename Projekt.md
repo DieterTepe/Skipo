@@ -214,6 +214,29 @@ Standardwerte in `ki-taktik.js` = diese Einstellung. Nicht wirksame Schalter ste
 dort auf 0/false, dokumentiert für spätere Versuche. Stellschraube, falls die KI zu
 hart ist: `AVOID_OPEN_LIMIT` (kleiner = blockt nur im Endspiel).
 
+### 6.4 Versuche 14.11.2026 – Dieters Spielideen (Zweig `ki-versuche`, alle Schalter aus)
+Gemessen mit `--basis` (A = 7.0.2 mit Blockade), 2000 Paare je Variante, Seed 1.
+Zähler-Check: Jeder Schalter greift tatsächlich (siehe Spalte „greift").
+
+| Idee / Schalter in `ki-taktik.js` | greift | gegen 7.0.2 | gegen Bot (7.0.2: 81,8) |
+|---|---|---|---|
+| Kettenbedrohung: Zug meiden, der Gegner-Stock über sichtbare Ablagen erreichbar macht (`CHAIN_AVOID`, `CHAIN_STOCK`) | oft | **46,3 %** (Gegner-Stock ≤5: 49,3) | – |
+| … + Kettenlänge ≥2/3/4 (`CHAIN_LIMIT`) | oft | 44–45 % | – |
+| … nur Kette ≥3, +2 länger, mit eigener Deckkarte erlaubt | selten | 50,8 % | 82,5 % |
+| `CHAIN_STOCK` + eigene Deckkarte erlaubt (`CHAIN_ALLOW_COVER`) | selten | 50,0 % | 81,1 % |
+| Hand leeren bevorzugen (Stockkette bis Hand leer, `PLANNER_PREFER_CLEAR`) | ~1×/Spiel | 50,6 % / 50,4 % (Seed 2, 4000) | 82,5 % |
+| Serienstapel: größere auf kleinere Karte bestrafen (`SERIES_BREAK_PENALTY` 100/400/1500) | 18 % der Ablagen → ⅓ | 49,5 / 49,5 / 50,0 % | 81,3 % |
+| Joker nie verdecken + Joker auf Joker (`JOKER_HARD`, `JOKER_STACK`) | ~0,05×/Spiel | 50,0 % | 81,7 % |
+| **Kombi** Hand leeren + milde Kette (4000 Paare) | | **51,1 % / 51,4 %** (zwei Seeds, ±1,1) | |
+
+**Befund:** Keine Idee erreicht die Übernahmeschwelle (> 53 %). Züge zu verweigern lohnt
+sich nur bei der direkten Öffnung (V−1, `AVOID_OPEN`); jede weitere Verweigerung kostet
+mehr Tempo als sie blockt. Ablage-Ordnung und Jokerschutz sind schon nahe am Optimum
+(Joker wird bereits fast nie verdeckt). Die Kombi bringt reproduzierbar ≈ +1 Punkt –
+echt, aber im Spiel kaum spürbar. Entscheidung: 7.0.2 bleibt; Schalter bleiben im Code
+(Standard aus, Verhalten Zug für Zug identisch mit 7.0.2, per test-sim.js geprüft).
+Prüfstand: neue Option `--basis` (A = aktuelle Taktik statt Taktik aus).
+
 ### 6.3 Offene KI-Ideen (messbar)
 - Ablage-Strategie (Ketten auf Ablagestapeln; sichtbare Gegner-Ablagen) – bisher ohne Wirkung.
 - Schwierigkeitsgrade = `KI_TAKTIK.ENABLED` false/true (+ evtl. KONFIG-Sätze).

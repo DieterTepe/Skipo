@@ -37,6 +37,27 @@ let KI_TAKTIK = {
   // Zählt ein Hand-Joker als eigene Deckkarte? (false gemessen: −0,6 → true)
   FOLLOW_JOKER:          true,
 
+  // ── 7.0.3: KETTENBEDROHUNG (siehe Messungen in Projekt.md) ───────
+  // Zug verweigern, wenn der Gegner danach mit sichtbaren Karten (Stock-Oberkarte +
+  // Ablagestapel) mehr legen kann als vorher.
+  CHAIN_AVOID:           false,   // Hauptschalter
+  CHAIN_STOCK:           true,    // Stockkarte des Gegners wird durch den Zug erst erreichbar
+  CHAIN_LIMIT:           0,       // Kette ≥ Grenze (0 = aus)
+  CHAIN_DELTA:           1,       // … und um ≥ so viele länger als vorher
+  CHAIN_OPP_STOCK_LIMIT: 20,      // nur wenn Gegner-Stock ≤ …
+  CHAIN_SKIP_STOCKMOVE:  true,    // eigene Stockzüge nie verweigern
+  CHAIN_ALLOW_COVER:     false,   // mit eigener Deckkarte trotzdem spielen
+
+  // ── 7.0.3: ABLAGE, JOKER, HAND LEEREN ─────────────────────────────
+  // Planer: bei gleichem Stockabbau Ketten bevorzugen, die danach die Hand leeren (5 neue Karten)
+  PLANNER_PREFER_CLEAR:  false,
+  // Ablage: größere Karte auf kleinere = Strafe je Stapelhöhe (max. SERIES_LEN_CAP). 0 = aus
+  SERIES_BREAK_PENALTY:  0,
+  SERIES_LEN_CAP:        3,
+  // Ablage: Joker nie verdecken (außer es gibt keinen anderen Stapel); Joker auf Joker erlaubt
+  JOKER_HARD:            false,
+  JOKER_STACK:           false,
+
   // ── OHNE MESSBARE WIRKUNG (deshalb aus/0; für spätere Versuche) ──
   // Gegner-Ziel = sichtbare Stockkarte statt Wahrscheinlichkeit (Marker/Stock-Attacke)
   VISIBLE_STOCK:         false,

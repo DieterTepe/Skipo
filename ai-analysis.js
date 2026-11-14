@@ -70,6 +70,72 @@ AI.Analysis = {
     return { value: V, open, bridge, tops, oppStock: human.stock.length };
   },
 
+  /**
+   * Kettenbedrohung (7.0.3): Wie viele Karten könnte der Gegner nacheinander legen,
+   * wenn die Baustapel die Bedarfswerte `needs` (je 1..12) haben – nur mit SICHTBAREN
+   * Karten (Stock-Oberkarte + komplette Ablagestapel; Handkarten sind unbekannt)?
+   * Tiefensuche mit Merkliste, Obergrenze für Knoten.
+   * @returns {{count:number, reach:boolean}} count = längste Kette, reach = Stockkarte
+   *          des Gegners ist in irgendeiner Kette spielbar (nur normale Karte, kein Joker)
+   */
+  chainThreat(needs) {
+    const human = State.player('human');
+    const stacks = human.discards.map(d => d.map(c => c.type === 'joker' ? 0 : parseInt(c.value, 10)));
+    const sTop = human.stock[human.stock.length - 1];
+    const stockVal = !sTop ? -1 : (sTop.type === 'joker' ? 0 : parseInt(sTop.value, 10));
+    const lens = stacks.map(a => a.length);
+    const n = needs.slice();
+    const seen = new Map();
+    let nodes = 0, reach = false;
+
+    const rec = (stockUsed) => {
+      const key = n.join(',') + '|' + lens.join(',') + '|' + (stockUsed ? 1 : 0);
+      if (seen.has(key)) return seen.get(key);
+      if (++nodes > 4000) return 0;
+      let best = 0;
+      const tryCard = (val, onUsed) => {
+        for (let p = 0; p < n.length; p++) {
+          if (val !== 0 && val !== n[p]) continue;
+          const old = n[p];
+          n[p] = old === 12 ? 1 : old + 1;
+          const got = 1 + onUsed();
+          n[p] = old;
+          if (got > best) best = got;
+        }
+      };
+      if (!stockUsed && stockVal >= 0) {
+        // Stockkarte spielen (Joker oben zählt als Kette, aber nicht als "erreichbar")
+        for (let p = 0; p < n.length; p++) {
+          if (stockVal !== 0 && stockVal !== n[p]) continue;
+          if (stockVal !== 0) reach = true;
+          const old = n[p];
+          n[p] = old === 12 ? 1 : old + 1;
+          const got = 1 + rec(true);
+          n[p] = old;
+          if (got > best) best = got;
+        }
+      }
+      for (let d = 0; d < stacks.length; d++) {
+        if (lens[d] === 0) continue;
+        const val = stacks[d][lens[d] - 1];
+        lens[d]--;
+        tryCard(val, () => rec(stockUsed));
+        lens[d]++;
+      }
+      seen.set(key, best);
+      return best;
+    };
+    const count = rec(false);
+    return { count, reach };
+  },
+
+  /** Bedarfswerte aller Baustapel (1..12), optional mit einem Zug darauf. */
+  buildNeeds(pileIdx, eff) {
+    const needs = State.game.buildPiles.map(p => Rules.nextNeeded(p));
+    if (pileIdx !== undefined) needs[pileIdx] = eff === 12 ? 1 : eff + 1;
+    return needs;
+  },
+
   /** Gegner-Ziel: sichtbare Stockkarte (Taktik an) oder Wahrscheinlichkeitsschätzung. */
   enemyTarget(opponent) {
     const T = AI.taktik();
