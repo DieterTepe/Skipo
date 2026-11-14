@@ -13,7 +13,7 @@
 //       geladen. Jeder DOM-Zugriff = sofortiger Fehler.
 //    2. Ein deterministischer „Mensch-Bot" spielt gegen die KI.
 //       Der Zufall (nur Mischen) kommt aus einem Seed-Generator.
-//    3. Invarianten je Zug: 156 Karten, Baustapel aufsteigend,
+//    3. Invarianten je Zug: 156 Karten, Baustapel aufsteigend, KI legt höchstens 1× ab,
 //       Hand ≤ 5, Stock nur von oben.
 //    4. Äquivalenz: Dieselben Spiele laufen mit demselben Seed durch
 //       die 7.0.0-Engine (state/engine/ai/view/endgame.js mit
@@ -281,6 +281,7 @@ async function playGame(engine, seed, isNew) {
     turns++;
     if (isNew) { invariant = engine.api.check(); if (invariant) break; }
     engine.resetReady();
+    const mark = engine.log().length;
     const r = humanPlay(engine.api);
     if (r === 'over') break;
     if (r === 'pass' && !isNew) engine.api.pass();
@@ -288,6 +289,11 @@ async function playGame(engine, seed, isNew) {
     // auf die KI warten: bis der Mensch wieder dran ist oder das Spiel vorbei ist
     await waitFor(() => engine.api.over() || engine.ready());
     await tick(); await tick();
+    // Regel (7.0.3): Die KI legt pro Zug höchstens EINE Karte ab
+    if (isNew) {
+      const n = engine.log().slice(mark).filter(e => e.startsWith('ai:') && e.includes('>D')).length;
+      if (n > 1) { invariant = 'KI legt ' + n + ' Karten in einem Zug ab'; break; }
+    }
   }
   if (isNew && !invariant) invariant = engine.api.check();
   return { turns, result: engine.api.result(), log: engine.log().slice(), invariant, stuck: turns >= 400 };

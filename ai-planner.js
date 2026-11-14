@@ -33,7 +33,7 @@ AI.Planner = {
     const hand      = ai.hand.map(c => c.type === 'joker' ? 0 : c.value);
     const discs     = ai.discards.map(pile => pile.map(c => c.type === 'joker' ? 0 : c.value));
     const stockVals = ai.stock.map(c => c.type === 'joker' ? 0 : c.value);
-    return { builds, hand, discs, stockLen: stockVals.length, stockVals };
+    return { builds, hand, discs, stockLen: stockVals.length, stockVals, stockLen0: stockVals.length };
   },
 
   /** Schlüssel für den Besucht-Speicher. */
@@ -49,8 +49,11 @@ AI.Planner = {
     const moves  = [];
     const needed = st.builds.map(b => b + 1);
 
-    // 1. Stockkarte
-    if (st.stockLen > 0) {
+    // 1. Stockkarte (7.0.3 PLANNER_FAIR_STOCK: nur die sichtbare oberste – die Karten darunter
+    //    liegen verdeckt und dürfen nicht in die Planung eingehen)
+    const T = AI.taktik();
+    const fair = !!(T && T.PLANNER_FAIR_STOCK);
+    if (st.stockLen > 0 && (!fair || st.stockLen === st.stockLen0)) {
       const top = st.stockVals[st.stockLen - 1];
       for (let p = 0; p < 4; p++) {
         if (top === needed[p]) {
@@ -109,7 +112,8 @@ AI.Planner = {
       hand:      st.hand.slice(),
       discs:     st.discs,
       stockLen:  st.stockLen,
-      stockVals: st.stockVals
+      stockVals: st.stockVals,
+      stockLen0: st.stockLen0
     };
     next.builds[mv.pile] = next.builds[mv.pile] + 1;
     if (next.builds[mv.pile] === 12) next.builds[mv.pile] = 0;
@@ -152,7 +156,16 @@ AI.Planner = {
       if (V !== null && cand.open !== best.open) return !cand.open;
       if (preferClear && !!cand.clears !== !!best.clears) return !!cand.clears;
       if (cand.jokers     !== best.jokers)     return cand.jokers     < best.jokers;
-      return cand.moves.length < best.moves.length;
+      if (T && T.PLANNER_HAND_FIRST) {
+        const h = c => c.moves.reduce((s, m) => s + (m.src === 'hand' && !m.isJoker ? 1 : 0), 0);
+        if (h(cand) !== h(best)) return h(cand) > h(best);
+      }
+      if (cand.moves.length !== best.moves.length) return cand.moves.length < best.moves.length;
+      if (T && T.PREFER_SRC) {
+        const cnt = c => c.moves.reduce((s, m) => s + (m.src === T.PREFER_SRC ? 1 : 0), 0);
+        return cnt(cand) > cnt(best);
+      }
+      return false;
     }
 
     const self = this;
@@ -167,6 +180,7 @@ AI.Planner = {
 
       for (const mv of self.moves(st)) {
         if (mv.isJoker && jokers >= KI_PLANNER.MAX_JOKERS_PER_CHAIN) continue;
+        if (mv.isJoker && !mv.fromStock && goal === 'clear' && T && T.CLEAR_NO_JOKER) continue;   // 7.0.3
 
         const nJokers = jokers + (mv.isJoker ? 1 : 0);
         const nStock  = stockPlays + (mv.fromStock ? 1 : 0);

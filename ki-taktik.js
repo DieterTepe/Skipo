@@ -1,87 +1,114 @@
 // ================================================================
-//  ki-taktik.js  –  Skipo 7.0.2   Namensraum: KI_TAKTIK
-//  BLOCKADE-TAKTIK GEGEN DIE SICHTBARE GEGNER-STOCKKARTE
+//  ki-taktik.js  –  Skipo 7.0.3   Namensraum: KI_TAKTIK
+//  TAKTIK-SCHALTER DER KI (Blockade, Joker, Ablage, Quellenwahl)
 // ----------------------------------------------------------------
 //  Eigener Block wie KI_PLANNER: wird beim Einfügen einer Tuner-
 //  Ausgabe (konfig.js) NICHT überschrieben.
 //
-//  Kernidee: Die oberste Stockkarte des Gegners ist sichtbar (Wert V).
-//  Ein Baustapel, dessen nächster benötigter Wert V ist, steht
-//  „offen" – der Gegner legt seine Stockkarte sofort ab. Die KI
-//  konnte bisher nie einen Zug verweigern; jetzt kann sie es.
-//
 //  Alle Werte mit tune-sim.js gemessen (KI gegen KI, gepaarte Spiele,
-//  2000 je Messung). Ergebnis der Gesamt-Einstellung gegen 7.0.1:
-//  59 % Siegrate (±2), gegen den einfachen Bot 80 % statt 73 %.
-//  Details in Projekt.md, Abschnitt 10.
+//  2000–4000 Paare je Messung, zwei Seeds). Stand 7.0.3:
+//    gegen 7.0.2 ........ 68,9 % / 68,1 %  (±1,0)
+//    gegen einfachen Bot  92,5 %           (7.0.2: 81,8 %)
+//  Einzelmessungen: Projekt.md, Abschnitt 6.
 //
-//  ENABLED: false → KI verhält sich exakt wie 7.0.1/7.0.0
-//  (test-sim.js nutzt das für den Äquivalenzbeweis).
+//  Rückfall ohne Datei-Tausch:
+//    ENABLED: false ............... KI spielt exakt wie 7.0.1/7.0.0
+//    Block „NEU IN 7.0.3" auf die  KI spielt exakt wie 7.0.2
+//    dort genannten Altwerte ......(Zug für Zug, mit test-sim.js geprüft)
 // ================================================================
 
 let KI_TAKTIK = {
   ENABLED:               true,
 
-  // ── WIRKSAM (gemessen) ────────────────────────────────────────
+  // ── WIRKSAM SEIT 7.0.2 ────────────────────────────────────────
+  // V = sichtbare Stockkarte des Gegners.
   // Öffnende Züge verweigern: Karte V-1 aus Hand/Ablage NICHT spielen,
   // wenn die KI die Deckkarte (V oder Joker) nicht selbst nachlegen kann.
-  // Grenze = Gegner-Stock ≤ AVOID_OPEN_LIMIT (20 = immer; 12 → +3,7, 6 → +1,5, 20 → +7 Punkte)
+  // Grenze = Gegner-Stock ≤ AVOID_OPEN_LIMIT (20 = immer)
   AVOID_OPEN:            true,
   AVOID_OPEN_LIMIT:      20,
-  // Auch Züge auf V-2 verweigern, wenn die Brückenkarte V-1 beim Gegner
-  // sichtbar auf einem Ablagestapel liegt (+1,5 Punkte)
+  // Auch V-2 verweigern, wenn die Brückenkarte V-1 beim Gegner sichtbar liegt
   AVOID_SECOND:          true,
-  // Joker NICHT über die Score-Heuristik spielen – nur in Planer-Ketten
-  // (garantierter Nutzen) und aus dem Stock. Entspricht SCORE_42 = 0 (+3 Punkte)
+  // Joker NICHT über die Score-Heuristik spielen – nur in Planer-Ketten und aus dem Stock
   JOKER_HEURISTIC:       false,
-  // Zählt ein Hand-Joker als eigene Deckkarte? (false gemessen: −0,6 → true)
+  // Zählt ein Hand-Joker als eigene Deckkarte?
   FOLLOW_JOKER:          true,
 
-  // ── 7.0.3: KETTENBEDROHUNG (siehe Messungen in Projekt.md) ───────
-  // Zug verweigern, wenn der Gegner danach mit sichtbaren Karten (Stock-Oberkarte +
-  // Ablagestapel) mehr legen kann als vorher.
-  CHAIN_AVOID:           false,   // Hauptschalter
-  CHAIN_STOCK:           true,    // Stockkarte des Gegners wird durch den Zug erst erreichbar
-  CHAIN_LIMIT:           0,       // Kette ≥ Grenze (0 = aus)
-  CHAIN_DELTA:           1,       // … und um ≥ so viele länger als vorher
-  CHAIN_OPP_STOCK_LIMIT: 20,      // nur wenn Gegner-Stock ≤ …
-  CHAIN_SKIP_STOCKMOVE:  true,    // eigene Stockzüge nie verweigern
-  CHAIN_ALLOW_COVER:     false,   // mit eigener Deckkarte trotzdem spielen
+  // ── NEU IN 7.0.3 (Altwert 7.0.2 jeweils in Klammern) ──────────
+  // 1) Joker am Zugende  (+10 Punkte gegen 7.0.2)
+  //    7.0.2 spielte einen übrigen Hand-Joker am Zugende einzeln auf einen
+  //    Baustapel (≈ 1,3 verschenkte Joker je Spiel) oder legte ihn ZUSÄTZLICH
+  //    zur normalen Karte ab (zwei Ablagen in einem Zug = Regelverstoß).
+  //    'keep' = Joker bleibt in der Hand, genau eine Ablage.
+  //    Andere Werte: 'legacy' (7.0.2) | 'park' (Joker ist die Ablage) | 'single'
+  JOKER_END:             'keep',    // ('legacy')
+  JOKER_END_DIRECT:      false,     // (true)  Joker am Zugende einzeln auf Baustapel
+  JOKER_END_COMBO:       true,      //         Ablagekarte + Joker am Zugende (ohne Wirkung)
+  // 2) Ablage: Was behalten?  (+4 Punkte)
+  //    Karten auf dem Weg eines Baustapels zur EIGENEN Stockkarte nicht ablegen;
+  //    doppelt gehaltene Werte zuerst ablegen. Gewichte, 0 = aus.
+  DISC_KEEP_USEFUL:      1500,      // (0)
+  DISC_DUP:              600,       // (0)
+  // 3) Sicherheitsabstand zur Gegner-Stockkarte  (+2 Punkte)
+  //    1 = nur V-1 | 2 = auch V-2 ohne Brücke | 3 = auch V-3 (4: +1, 5: +1, 6: ±0)
+  AVOID_DIST:            3,         // (1)
+  // 4) Quellenwahl  (+3,5 Punkte; 'discard' gemessen: −3,3)
+  //    Liegt dieselbe Karte in der Hand UND oben auf einer Ablage → Handkarte
+  //    spielen (mehr Nachziehen). '' = aus.
+  PREFER_SRC:            'hand',    // ('')
 
-  // ── 7.0.3: ABLAGE, JOKER, HAND LEEREN ─────────────────────────────
-  // Planer: bei gleichem Stockabbau Ketten bevorzugen, die danach die Hand leeren (5 neue Karten)
-  PLANNER_PREFER_CLEAR:  false,
-  // Ablage: größere Karte auf kleinere = Strafe je Stapelhöhe (max. SERIES_LEN_CAP). 0 = aus
-  SERIES_BREAK_PENALTY:  0,
-  SERIES_LEN_CAP:        3,
-  // Ablage: Joker nie verdecken (außer es gibt keinen anderen Stapel); Joker auf Joker erlaubt
-  JOKER_HARD:            false,
-  JOKER_STACK:           false,
+  // ── FAIRNESS-SCHALTER (Entscheidung offen) ────────────────────
+  // Der Zugketten-Planer rechnet seit 6.6.0 mit den VERDECKTEN Karten des
+  // eigenen Stockstapels. true = nur die sichtbare oberste Stockkarte.
+  // Kostet 3,5–4 Punkte (65 % statt 68,5 % gegen 7.0.2).
+  PLANNER_FAIR_STOCK:    false,
 
-  // ── OHNE MESSBARE WIRKUNG (deshalb aus/0; für spätere Versuche) ──
-  // Gegner-Ziel = sichtbare Stockkarte statt Wahrscheinlichkeit (Marker/Stock-Attacke)
-  VISIBLE_STOCK:         false,
-  // Score-Malus für öffnende Züge / Bonus für zudeckende Züge / Malus V-2 mit Brücke
-  // (verschieben nur die Reihenfolge – die KI spielt jeden Zug ohnehin)
-  OPEN_PENALTY:          0,
+  // ── GEMESSEN, OHNE GEWINN (aus/0; für spätere Versuche) ───────
+  // Joker
+  CLEAR_NO_JOKER:        false,   // Hand-leeren-Ketten ohne Joker (+0,9 / −0,2)
+  JOKER_SURPLUS:         0,       // ab N Hand-Jokern einen frei spielen (2: −0,6; 3: ±0)
+  JOKER_KEEP_MAX:        0,       // mehr als N Joker → einen parken (2: −0,5; 1: −2,5)
+  JOKER_HARD:            false,   // Joker auf der Ablage nie verdecken (±0, passiert ohnehin fast nie)
+  JOKER_STACK:           false,   // Joker auf Joker stapeln (±0)
+  JOKER_COVER_LIMIT:     0,       // offenen Stapel mit Hand-Joker zudecken, Gegner-Stock ≤ … (+0,5)
+  ATTACK_JOKER:          false,   // Stock-Attacke in der Vorbereitung darf Joker einsetzen
+  // Blockade
+  AVOID_WRAP:            false,   // Rundlauf 12→1 beachten (+0,2)
+  AVOID_OWN_MIN:         0,       // eigener Stock ≤ … → nichts mehr verweigern (3: −0,8; 6: −1,7)
+  AVOID_STOCK_LIMIT:     0,       // auch eigene Stockkarte nicht öffnend spielen, Gegner-Stock ≤ …
+  AVOID_DISCARD_TOPS:    false,   // keinen Stapel für Gegner-Ablage-Oberkarten öffnen (−0,8)
+  VISIBLE_STOCK:         false,   // Gegner-Ziel = sichtbare Stockkarte (Marker/Stock-Attacke)
+  OPEN_PENALTY:          0,       // Score-Malus/-Bonus verschieben nur die Reihenfolge
   OPEN_STOCKMOVE_FACTOR: 0.25,
   OPEN_FOLLOWUP_FACTOR:  0.25,
   COVER_BONUS:           0,
   SECOND_PENALTY:        0,
   ENDGAME_LIMIT:         6,
   ENDGAME_FACTOR:        2.0,
-  // Offenen Stapel am Zugende mit Hand-Joker zudecken, wenn Gegner-Stock ≤ … (0 = nie)
-  JOKER_COVER_LIMIT:     0,
-  // Auch die eigene Stockkarte nicht öffnend spielen, wenn Gegner-Stock ≤ … (0 = nie)
-  AVOID_STOCK_LIMIT:     0,
-  // Auch keinen Stapel für die Ablage-Oberkarten des Gegners öffnen (−0,8)
-  AVOID_DISCARD_TOPS:    false,
-  // Planer: bei gleichem Stockabbau Ketten bevorzugen, die nicht offen enden
-  PLANNER_AVOID_OPEN:    false,
-  // Planer-Risikoprüfung unabhängig vom Gegner-Stock
-  RISK_ALWAYS:           false,
-  // Stock-Attacke in der Vorbereitung darf Joker einsetzen
-  ATTACK_JOKER:          false,
-  // Nach einem Stock-Fallback-Zug weiterspielen statt abzulegen
-  CONTINUE_AFTER_FALLBACK: false
+  // Kettenbedrohung: Zug meiden, nach dem der Gegner mit sichtbaren Karten mehr legen kann
+  CHAIN_AVOID:           false,   // Hauptschalter (−3,7; mit Deckkarten-Ausnahme ±0)
+  CHAIN_STOCK:           true,
+  CHAIN_LIMIT:           0,
+  CHAIN_DELTA:           1,
+  CHAIN_OPP_STOCK_LIMIT: 20,
+  CHAIN_SKIP_STOCKMOVE:  true,
+  CHAIN_ALLOW_COVER:     false,
+  // Leerlaufzüge zurückhalten (dem Gegner Anlegestellen nehmen): STARK NEGATIV
+  IDLE_HOLD:             '',      // 'all' −13 | 'hand' −21 | 'discard' −2
+  IDLE_OWN_PATH:         0,       // nur Richtung eigener Stock (3: −13; 6: −10)
+  // Ablage
+  DISC_COVER_USEFUL:     0,       // nützliche Karte nicht verdecken (±0 zusätzlich)
+  DISC_KEEP_PLAYABLE:    0,       // bald spielbare Karte behalten (±0 zusätzlich)
+  DISC_COVER_PLAYABLE:   0,
+  DISC_SAME:             0,       // gleicher Wert auf gleichen Wert (−0,5)
+  DISC_OPENER:           0,       // blockierte Karte zuerst ablegen (300: +1; 1000: −3)
+  DISC_KEEP_OPPV:        0,       // Deckkarte behalten (300: +0,5; 1000: −1)
+  SERIES_BREAK_PENALTY:  0,       // Serienstapel: größere auf kleinere bestrafen (±0)
+  SERIES_LEN_CAP:        3,
+  // Planer
+  PLANNER_PREFER_CLEAR:  false,   // Stockkette bis Hand leer verlängern (+0,5)
+  PLANNER_HAND_FIRST:    false,   // mehr Handkarten vor kürzerer Kette (−1,5)
+  PLANNER_AVOID_OPEN:    false,   // Ketten meiden, die offen enden (±0)
+  RISK_ALWAYS:           false,   // Risikoprüfung unabhängig vom Gegner-Stock (±0)
+  CONTINUE_AFTER_FALLBACK: false  // nach Stock-Fallback weiterspielen
 };

@@ -1,13 +1,14 @@
-# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.2
+# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.3 (Zweig, noch nicht freigegeben)
 
 > **Zweck dieser Datei:** Übergabe-Dokument. Wer einen neuen Chat startet, liest
 > zuerst diese Datei und weiß sofort, was Stand, Regeln, Entscheidungen und
 > nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
-**Letzte Aktualisierung:** 04.09.2026 — **7.0.2 ist live.** Alle Dateien liegen aktuell
-im Projektordner. Erstes Live-Spiel durch Dieter: fehlerfrei, Auswertung beider Seiten
-läuft wie gewünscht. Dieter testet derzeit eine größere Menge Spiele; bisher keine
-Auffälligkeiten. Danach: weitere KI-Ideen messen oder Ideenpool (Abschnitt 8).
+**Letzte Aktualisierung:** 14.11.2026 — **Live ist 7.0.2** (`main`). **7.0.3 liegt fertig
+auf dem Zweig `v7.0.3`** und wartet auf Dieters Freigabe: 68,5 % Siegrate gegen 7.0.2,
+92,5 % gegen den einfachen Bot. Offene Entscheidung: faire Stockplanung
+(`PLANNER_FAIR_STOCK`, Abschnitt 6.5). Weil die KI deutlich stärker wird, sind
+Schwierigkeitsstufen der naheliegende nächste Schritt (Abschnitt 8).
 
 ---
 
@@ -18,6 +19,10 @@ Auffälligkeiten. Danach: weitere KI-Ideen messen oder Ideenpool (Abschnitt 8).
 - **Architektur (seit 7.0.1):** vier Schichten (core → ai → flow/tracking → ui), ein
   Namensraum je Datei, Ereignisbus, Meldungsschlüssel (DE/EN/PT), ein Speicher-Zugang.
   Kein DOM in core/ai/flow/tracking → alles läuft in Node und ist simulierbar.
+- **KI 7.0.3 (Zweig `v7.0.3`):** Joker bleiben am Zugende in der Hand, Ablage behält Karten
+  für die eigene Stockkarte, Sicherheitsabstand 3, Handkarte vor Ablagekarte.
+  **68,5 % gegen 7.0.2**, 92,5 % gegen den Bot. Alles Schalter in `ki-taktik.js`; mit den
+  dort genannten Altwerten spielt der Code Zug für Zug wie 7.0.2.
 - **KI (seit 7.0.2):** Blockade-Taktik in `ki-taktik.js` – die KI verweigert Züge, die
   einen Baustapel für die sichtbare Gegner-Stockkarte öffnen, und hebt Joker für
   Planer-Ketten auf. Gemessen: **59 % Siegrate gegen 7.0.1**, 80 % gegen den Bot (7.0.1: 73 %).
@@ -34,7 +39,7 @@ Auffälligkeiten. Danach: weitere KI-Ideen messen oder Ideenpool (Abschnitt 8).
 
 ---
 
-## 1. Dateisatz 7.0.2 (Ladereihenfolge = Abhängigkeit)
+## 1. Dateisatz 7.0.2 / 7.0.3 (Ladereihenfolge = Abhängigkeit)
 
 ```
 Skipo/  (Repo-Wurzel, GitHub Pages, flach)
@@ -42,7 +47,7 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 │  ── Konfiguration ──
 ├── konfig.js            let KONFIG      Tuner-Werte SCORE_* – NUR dieser Block wird vom Tuner ersetzt (unverändert seit 6.6.0)
 ├── ki-planner.js        const KI_PLANNER Planer-Konfiguration (unverändert)
-├── ki-taktik.js         let KI_TAKTIK   Blockade-Taktik 7.0.2 – eigener Block, vom Tuner nicht berührt
+├── ki-taktik.js         let KI_TAKTIK   Taktik-Schalter (Blockade 7.0.2, Joker/Ablage/Abstand/Quelle 7.0.3) – vom Tuner nicht berührt
 │
 │  ── core: Fundament, KEIN DOM ──
 ├── core-events.js       Events    on / off / emit – Ereignisbus (Liste der Ereignisse im Dateikopf)
@@ -88,6 +93,7 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 ├── test-sim.js          Invarianten + Äquivalenz gegen 7.0.0 (Abschnitt 5)
 ├── tune-sim.js          KI gegen KI: Konfigurationsvergleich, Sweep, Bot (Abschnitt 6)
 │
+├── SkipBo_7_0_3.html    (Zweig v7.0.3) wie 7_0_2, alle ?v=7.0.3
 ├── SkipBo_7_0_2.html    DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
 ├── style.css            CSS (Karten, Felder, Menü, Overlays, Endscreen, Vergleichstabelle)
 ├── impressum.html / datenschutz.html   „Zurück"-Link auf SkipBo_7_0_2.html
@@ -233,13 +239,60 @@ Zähler-Check: Jeder Schalter greift tatsächlich (siehe Spalte „greift").
 sich nur bei der direkten Öffnung (V−1, `AVOID_OPEN`); jede weitere Verweigerung kostet
 mehr Tempo als sie blockt. Ablage-Ordnung und Jokerschutz sind schon nahe am Optimum
 (Joker wird bereits fast nie verdeckt). Die Kombi bringt reproduzierbar ≈ +1 Punkt –
-echt, aber im Spiel kaum spürbar. Entscheidung: 7.0.2 bleibt; Schalter bleiben im Code
-(Standard aus, Verhalten Zug für Zug identisch mit 7.0.2, per test-sim.js geprüft).
+echt, aber im Spiel kaum spürbar. Diese Schalter bleiben aus (Stand danach: Abschnitt 6.5).
 Prüfstand: neue Option `--basis` (A = aktuelle Taktik statt Taktik aus).
 
-### 6.3 Offene KI-Ideen (messbar)
-- Ablage-Strategie (Ketten auf Ablagestapeln; sichtbare Gegner-Ablagen) – bisher ohne Wirkung.
-- Schwierigkeitsgrade = `KI_TAKTIK.ENABLED` false/true (+ evtl. KONFIG-Sätze).
+### 6.5 Versuchsreihe 2 (14.11.2026) → Version 7.0.3
+Auftrag: „Prüfe das Gesamte, ob nicht doch noch eine Stellschraube zu finden ist."
+Vorgehen: jede Stelle, an der die KI wirklich **entscheidet** (nicht nur sortiert),
+als Schalter gebaut und gemessen. ~75 Messungen, 2000–4000 Paare, `--basis`.
+
+**Was gefunden wurde (in dieser Reihenfolge zur Basis gemacht):**
+
+| Stellschraube | Schalter (Altwert) | Gewinn |
+|---|---|---|
+| **Joker am Zugende behalten.** 7.0.2 spielte einen übrigen Hand-Joker am Zugende einzeln auf einen Baustapel (≈1,3 Joker je Spieler und Spiel verschenkt) oder legte ihn zusätzlich zur normalen Karte ab. | `JOKER_END:'keep'` (`'legacy'`), `JOKER_END_DIRECT:false` (`true`) | 59,9 % / 59,3 % gegen 7.0.2 |
+| **Ablage: Karten für die eigene Stockkarte behalten**, Doppelte zuerst ablegen | `DISC_KEEP_USEFUL:1500` (0), `DISC_DUP:600` (0) | +4 (54,0 % allein) |
+| **Sicherheitsabstand 3** zur Gegner-Stockkarte (V−2, V−3 auch ohne Brücke) | `AVOID_DIST:3` (1) | +2 (zusammen mit Ablage 57,0 %) |
+| **Handkarte vor Ablagekarte**, wenn beide dieselbe Karte bieten | `PREFER_SRC:'hand'` (`''`) | 53,7 / 53,5 / 52,8 % (drei Seeds); `'discard'`: 46,7 % |
+| **Gesamt 7.0.3 gegen 7.0.2** (4000 Paare) | | **68,9 % / 68,1 %** (±1,0) |
+| Gesamt gegen einfachen Bot | | **92,5 %** (7.0.2: 81,8 %) |
+
+**Zwei Befunde, die keine Spielstärke-, sondern Regelfragen sind:**
+- **Doppelablage (Fehler in 7.0.2):** In ≈ jedem zweiten Spiel legte die KI zwei Karten in
+  einem Zug ab (normale Karte + Joker „sichern"). Vor 7.0.2 trat das nicht auf, weil die
+  Joker vorher verspielt wurden. Mit `JOKER_END:'keep'` behoben; `test-sim.js` prüft jetzt
+  als Invariante „KI legt höchstens 1× je Zug ab" (36 342 Züge: immer genau 1).
+- **Verdeckte eigene Stockkarten:** Der Planer (`AI.Planner.snapshot/moves`) rechnet seit
+  6.6.0 mit allen Karten des eigenen Stockstapels, also auch den verdeckten. Schalter
+  `PLANNER_FAIR_STOCK:true` plant nur mit der sichtbaren obersten: kostet 3,5–4 Punkte
+  (65,5 % / 64,5 % statt 68,9 % / 68,1 % gegen 7.0.2; Bot 91,3 %). **Entscheidung offen
+  (Dieter).** Auf Gegnerhand und Nachziehstapel greift die KI nirgends zu (geprüft).
+
+**Dieters Hypothese „dem Gegner das Legen verwehren → er zieht weniger nach":** direkt
+gemessen und klar widerlegt. Leerlaufzüge zurückhalten: alle −13, nur Hand −21, nur
+Ablage −2, nur Richtung eigener Stock −10 bis −13 Punkte. Die eigenen Karten loszuwerden
+(und nachzuziehen) ist weit mehr wert, als dem Gegner Anlegestellen zu nehmen. Was vom
+Gedanken trägt, ist der Sicherheitsabstand (AVOID_DIST) – er verweigert nur wenige Züge.
+
+**Ohne Gewinn (Werte stehen in `ki-taktik.js` als Kommentar):** Joker parken / Überschuss
+spielen / Joker-Budget je Kette, Hand-leeren-Ketten ohne Joker, Rundlauf 12→1, Wettlauf-
+Ausnahme, Abstand 4–6 (+1 / +1 / ±0), blockierte Karten ablegen, Deckkarte behalten,
+nützliche Karte nicht verdecken, bald Spielbares behalten, Serienstapel, Kettenbedrohung,
+Planer: offenes Ende meiden / Risikoprüfung immer / mehr Suchknoten und Tiefe / Hand
+leeren bevorzugen / Handkarten zuerst (−1,5).
+
+**Kontrollen:** KI lässt nie eine spielbare Stockkarte liegen (0 von 36 342 Zügen).
+Mit 7.0.3 endet sie in 36 % der Züge mit Joker in der Hand (3+ Joker: 1 %).
+Altwerte im neuen Code = 7.0.2 Zug für Zug (62 322 Züge / 248 Siege identisch).
+Browsertest (Playwright, lokaler Server): komplettes Spiel, 0 Konsolenfehler.
+
+### 6.6 Offene KI-Ideen (messbar)
+- Ablage: **welche Karte** behalten wirkt (6.5); **wohin** ablegen bisher nicht.
+- Schwierigkeitsgrade liegen jetzt fertig vor: Leicht = `ENABLED:false` (7.0.1),
+  Mittel = 7.0.2-Werte, Schwer = 7.0.3. Abstände ≈ 59 % und ≈ 68 % je Stufe.
+- Erkenntnis für neue Ideen: Wirkung haben nur echte Entscheidungen (Joker halten,
+  Ablage, Quelle, Verweigern). Score-Verschiebungen sortieren nur.
 - Zweite Stockkarte ist nicht sichtbar → keine Taktik darauf (wäre Schummeln).
 
 ---
@@ -296,4 +349,5 @@ Prüfstand: neue Option `--basis` (A = aktuelle Taktik statt Taktik aus).
 | 6.6.0 | 06/2026 | Einzeldatei, Zugketten-Planer, Tuner-Werte Gen 188 |
 | 7.0.0 | 16.06.2026 | Aufteilung in HTML + CSS + 7 JS, verhaltensgleich |
 | 7.0.1 | 04.09.2026 | Neuarchitektur (Schichten, Namensräume, Events, I18n-Schlüssel, Store); Äquivalenz bewiesen; live abgenommen |
-| 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Auswertung beider Seiten, tune-sim.js; live, erstes Spiel fehlerfrei, ausgiebiger Test läuft |
+| 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Auswertung beider Seiten, tune-sim.js; live, von Dieter ausgiebig getestet (KI-Siegrate ≈ +20 Punkte) |
+| 7.0.3 | 14.11.2026 | Joker am Zugende behalten (behebt Doppelablage), Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. **Zweig `v7.0.3`, nicht freigegeben** |

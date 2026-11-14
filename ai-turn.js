@@ -320,8 +320,33 @@ const AI = {
 
       const jokerIdx = ai.hand.findIndex(c => c.type === 'joker');
       if (jokerIdx !== -1 && KONFIG.JOKER_COMBO_ENABLED) {
-        const d = await AI.Analysis.jokerHand(jokerIdx);
-        if (d) {
+        let d = await AI.Analysis.jokerHand(jokerIdx);
+        // 7.0.3-Versuche: Joker am Zugende nicht mehr einzeln verspielen
+        const TJ = this.taktik();
+        if (TJ && d) {
+          if ((d.action === 'buildDirect' && TJ.JOKER_END_DIRECT === false) ||
+              (d.action === 'buildCombo'  && TJ.JOKER_END_COMBO  === false)) {
+            d = { action: 'discard', targetPile: -1, discardIndex: AI.Analysis.jokerBestDiscard() };
+          }
+          if (d.action === 'discard' && TJ.JOKER_END && TJ.JOKER_END !== 'legacy') {
+            const nJ = ai.hand.filter(c => c.type === 'joker').length;
+            if (TJ.JOKER_END === 'park' || (TJ.JOKER_KEEP_MAX > 0 && nJ > TJ.JOKER_KEEP_MAX)) {
+              // Joker als EINZIGE Ablage auf den Jokerstapel (bleibt griffbereit, Handplatz wird frei)
+              if (Rules.playToDiscard('ai', 'hand', jokerIdx, d.discardIndex)) {
+                this.say('aiJokerSecured', d.discardIndex + 1);
+                await Clock.pause(0.8);
+              } else {
+                await this.discard('ai');
+              }
+            } else {
+              await this.discard('ai');          // 'keep' / 'single': genau eine Ablage
+            }
+            d = { action: 'done' };
+          }
+        }
+        if (d && d.action === 'done') {
+          /* bereits abgelegt */
+        } else if (d) {
           if (d.action === 'buildCombo') {
             // Erst die Ablagekarte spielen, dann den Joker
             this.say('aiJokerCombo', d.discardIndex + 1, d.targetPile + 1);
@@ -448,6 +473,13 @@ const AI = {
 
     const comboCache = AI.Analysis.handComboCache(player);
 
+    // 7.0.3-Versuche: Ablage nach Nützlichkeit
+    const T  = AI.taktik();
+    const DV = (T && (T.DISC_KEEP_USEFUL || T.DISC_COVER_USEFUL || T.DISC_KEEP_PLAYABLE || T.DISC_COVER_PLAYABLE))
+      ? AI.Analysis.discardValues() : null;
+    const keepJoker = !!(T && T.JOKER_END === 'keep') && handCards.some(c => c.type !== 'joker');
+    const thD = (T && (T.DISC_OPENER || T.DISC_KEEP_OPPV)) ? AI.Analysis.threat() : null;
+
     let bestDiscardIndex = -1, bestHandIndex = -1, bestScore = -Infinity;
 
     for (let h = 0; h < handCards.length; h++) {
@@ -463,6 +495,17 @@ const AI = {
       }
       if (criticalNumbers.includes(cardToPlay.value + 1)) cardTerm -= KONFIG.SCORE_37;
       if (comboCache[h] > 0) cardTerm -= KI_PLANNER.DISCARD_KEEP_COMBO_MALUS;
+      if (keepJoker && cardToPlay.type === 'joker') continue;
+      if (T && cardToPlay.type !== 'joker') {
+        const v = parseInt(cardToPlay.value, 10);
+        if (DV) cardTerm -= (T.DISC_KEEP_USEFUL || 0) * DV.useful(v) + (T.DISC_KEEP_PLAYABLE || 0) * DV.playable(v);
+        if (thD) {
+          const gap = thD.value - v;
+          if (T.DISC_OPENER && gap >= 1 && gap <= (T.AVOID_DIST || 1)) cardTerm += T.DISC_OPENER;
+          if (T.DISC_KEEP_OPPV && gap === 0) cardTerm -= T.DISC_KEEP_OPPV;
+        }
+        if (T.DISC_DUP && handCards.filter(c => c.type !== 'joker' && c.value === cardToPlay.value).length >= 2) cardTerm += T.DISC_DUP;
+      }
 
       for (let i = 0; i < discards.length; i++) {
         const pile    = discards[i];
@@ -496,8 +539,13 @@ const AI = {
           if (human.stock.length < 5) score -= KONFIG.SCORE_20;
         }
 
+        // 7.0.3: nützliche/bald spielbare Karte nicht verdecken; gleiche Werte stapeln
+        if (T && topCard && topCard.type !== 'joker') {
+          const tv = parseInt(topCard.value, 10);
+          if (DV) score -= (T.DISC_COVER_USEFUL || 0) * DV.useful(tv) + (T.DISC_COVER_PLAYABLE || 0) * DV.playable(tv);
+          if (T.DISC_SAME && cardToPlay.type !== 'joker' && cardToPlay.value === topCard.value) score += T.DISC_SAME;
+        }
         // 7.0.3: Serienstapel – größere Karte auf kleinere verdeckt die kleinere (bricht die Serie)
-        const T = AI.taktik();
         if (T && T.SERIES_BREAK_PENALTY > 0 && topCard && topCard.type !== 'joker' &&
             cardToPlay.type !== 'joker' && cardToPlay.value > topCard.value) {
           score -= T.SERIES_BREAK_PENALTY * Math.min(pile.length, T.SERIES_LEN_CAP);

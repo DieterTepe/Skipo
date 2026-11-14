@@ -206,12 +206,14 @@ AI.Eval = {
     if (candidates.length === 0) return [];
 
     const T = AI.taktik();
-    if (T && T.JOKER_HEURISTIC === false) {
+    const nJok = State.player('ai').hand.filter(c => c.type === 'joker').length;
+    if (T && T.JOKER_HEURISTIC === false && !(T.JOKER_SURPLUS > 0 && nJok >= T.JOKER_SURPLUS)) {
       candidates = candidates.filter(m => m.card.type !== 'joker');
       if (candidates.length === 0) return [];
     }
     if (T) this.applyThreat(candidates, T);
     if (T && T.CHAIN_AVOID) this.applyChain(candidates, T);
+    if (T && (T.IDLE_HOLD || T.IDLE_OWN_PATH > 0)) this.applyHold(candidates, T);
 
     const avgScore         = candidates.reduce((s, m) => s + m.score, 0) / candidates.length;
     const dynamicThreshold = avgScore * nagel40;
@@ -258,6 +260,15 @@ AI.Eval = {
       move.score = Math.round(move.score * priorities.riskTaking);
     });
 
+    if (T && T.PREFER_SRC) {
+      // 7.0.3-Versuch: gleiche Karte auf denselben Stapel → bevorzugte Quelle (Hand = mehr Nachziehen)
+      for (const m of filtered) {
+        if (m.sourceType !== T.PREFER_SRC || m.card.type === 'joker') continue;
+        const twin = filtered.find(o => o !== m && o.buildPileIndex === m.buildPileIndex && o.card.type !== 'joker' &&
+                                        o.card.value === m.card.value && o.sourceType !== 'stock' && o.sourceType !== T.PREFER_SRC);
+        if (twin && twin.score >= m.score) m.score = twin.score + 1;
+      }
+    }
     const result = filtered.sort((a, b) => b.score - a.score);
     return T ? result.filter(m => !m.avoid) : result;
   },
@@ -278,9 +289,23 @@ AI.Eval = {
     const canFollow = me.hand.some(c => (T.FOLLOW_JOKER && c.type === 'joker') || c.value === V) ||
                       me.discards.some(d => d.length > 0 && d[d.length - 1].value === V);
 
+    // 7.0.3-Versuche: Wettlauf (eigener Stock klein → nicht mehr verweigern), Abstand, Rundlauf 12→1
+    const race = me.stock.length <= (T.AVOID_OWN_MIN || 0);
+    const dist = T.AVOID_DIST || 1;
     for (const m of candidates) {
       const pile = piles[m.buildPileIndex];
       const eff  = m.card.type === 'joker' ? Rules.nextNeeded(pile) : m.card.value;
+      const gap  = T.AVOID_WRAP ? (V - eff + 12) % 12 : V - eff;   // 1 = öffnet direkt
+      if (race) {
+        /* kein Verzicht */
+      } else if (dist >= 2 && gap >= 2 && gap <= dist && !(gap === 2 && th.bridge)) {
+        m.avoid = m.sourceType !== 'stock' && th.oppStock <= T.AVOID_OPEN_LIMIT;
+      } else if (T.AVOID_WRAP && gap === 1 && eff !== V - 1) {
+        // Rundlauf: 12 räumt den Stapel → offen für Gegner-Stockkarte 1
+        const stockOk = m.sourceType !== 'stock' || th.oppStock <= T.AVOID_STOCK_LIMIT;
+        m.avoid = T.AVOID_OPEN && !canFollow && stockOk && th.oppStock <= T.AVOID_OPEN_LIMIT;
+      }
+      if (race) continue;
       if (eff === V - 1) {
         let pen = T.OPEN_PENALTY * w;
         if (m.sourceType === 'stock') pen *= T.OPEN_STOCKMOVE_FACTOR;
@@ -296,6 +321,28 @@ AI.Eval = {
         m.avoid = T.AVOID_SECOND && m.sourceType !== 'stock' && th.oppStock <= T.AVOID_OPEN_LIMIT;
       } else if (T.AVOID_DISCARD_TOPS && m.sourceType !== 'stock' && th.tops.includes(eff + 1)) {
         m.avoid = true;
+      }
+    }
+  },
+
+  /**
+   * Leerlaufzüge zurückhalten (7.0.3-Versuch): Züge aus Hand/Ablage, die nicht vom Planer
+   * kommen (kein Stockabbau, kein Hand-Leeren), bringen dem Gegner evtl. mehr als mir.
+   *   IDLE_HOLD     : 'all' = alle, 'hand' = nur Handkarten, 'discard' = nur Ablagekarten
+   *   IDLE_OWN_PATH : nur spielen, wenn der Stapel danach ≤ so viele Karten vor MEINER Stockkarte steht
+   */
+  applyHold(candidates, T) {
+    const me   = State.player('ai');
+    const sTop = me.stock[me.stock.length - 1];
+    const S    = sTop && sTop.type !== 'joker' ? parseInt(sTop.value, 10) : null;
+    for (const m of candidates) {
+      if (m.avoid || m.sourceType === 'stock') continue;
+      if (T.IDLE_HOLD === 'all' || T.IDLE_HOLD === m.sourceType) { m.avoid = true; continue; }
+      if (T.IDLE_OWN_PATH > 0 && S !== null) {
+        const pile = State.game.buildPiles[m.buildPileIndex];
+        const eff  = m.card.type === 'joker' ? Rules.nextNeeded(pile) : parseInt(m.card.value, 10);
+        const d    = (S - eff + 12) % 12;          // Karten, die danach noch bis zu meiner Stockkarte fehlen (+1)
+        if (d === 0 || d > T.IDLE_OWN_PATH) m.avoid = true;
       }
     }
   },

@@ -129,6 +129,34 @@ AI.Analysis = {
     return { count, reach };
   },
 
+  /**
+   * Kartenwerte für die Ablage-Entscheidung (7.0.3-Versuch).
+   *   useful(v)   0..1 – Karte liegt auf dem Weg eines Baustapels zu MEINER Stockkarte (kurzer Weg = hoch)
+   *   playable(v) 0..1 – wie bald ist die Karte auf irgendeinem Baustapel spielbar (1 = sofort)
+   */
+  discardValues() {
+    const me    = State.player('ai');
+    const needs = State.game.buildPiles.map(p => ((Rules.nextNeeded(p) - 1) % 12) + 1);
+    const sTop  = me.stock[me.stock.length - 1];
+    const S     = sTop && sTop.type !== 'joker' ? parseInt(sTop.value, 10) : null;
+    const useful = v => {
+      if (S === null) return 0;
+      let best = 0;
+      for (const n of needs) {
+        const L = (S - n + 12) % 12;
+        if (L === 0) continue;
+        if ((v - n + 12) % 12 < L) { const u = (13 - L) / 12; if (u > best) best = u; }
+      }
+      return best;
+    };
+    const playable = v => {
+      let d = 12;
+      for (const n of needs) { const x = (v - n + 12) % 12; if (x < d) d = x; }
+      return (12 - d) / 12;
+    };
+    return { useful, playable };
+  },
+
   /** Bedarfswerte aller Baustapel (1..12), optional mit einem Zug darauf. */
   buildNeeds(pileIdx, eff) {
     const needs = State.game.buildPiles.map(p => Rules.nextNeeded(p));
@@ -416,7 +444,10 @@ AI.Analysis = {
         score += (12 - (topCard.value || 6)) * 20;
         if (opponentCritical.includes(topCard.value + 1)) score -= 300;
       }
-      if (pile.length > 0 && pile[pile.length - 1].type === 'joker') score -= 200;
+      if (pile.length > 0 && pile[pile.length - 1].type === 'joker') {
+        const T = AI.taktik();
+        score += (T && T.JOKER_STACK) ? 5000 : -200;      // 7.0.3: Joker auf Joker stapeln
+      }
       if (score > bestScore) { bestScore = score; bestIdx = idx; }
     });
 
