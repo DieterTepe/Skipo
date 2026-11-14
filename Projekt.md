@@ -230,6 +230,12 @@ hart ist: `AVOID_OPEN_LIMIT` (kleiner = blockt nur im Endspiel).
 - Maßstab für KI-Änderungen ist die gemessene Siegrate in tune-sim.js, nicht die
   5-Spiele-Auswertung (die beschreibt nur, hat keinen Vergleichsmaßstab).
 - Neues Spiel = Seitenreload; `Flow.startGame()` ist zusätzlich in-page-fähig.
+- **GitHub-Ablauf (seit 14.11.2026):** Claude hat Schreibzugriff auf das Repo `DieterTepe/Skipo`
+  (flach, Zweig `main` = GitHub Pages = live). Jede Änderung bekommt eine neue Versionsnummer
+  (neue `SkipBo_x_y_z.html`, alle `?v=` gemeinsam hochzählen, `App.VERSION`, Zurück-Links in
+  impressum/datenschutz). Claude testet im Prüfstand, pusht auf einen Zweig `vX.Y.Z` (nichts live),
+  Dieter prüft und sagt „freigeben“, erst dann Übernahme nach `main`. Die alte Version bleibt als
+  Rückfall liegen. Nie direkt auf `main` ohne Freigabe.
 
 ---
 
