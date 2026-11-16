@@ -1,15 +1,14 @@
 // ================================================================
-//  ui-input.js  –  Skipo 7.0.1   Namensraum: Input
+//  ui-input.js  –  Skipo 7.0.4   Namensraum: Input
 //  SPIELER-EINGABE: Auswahl, Ablegen, Long-Press, verschiebbare Infozeile
 // ----------------------------------------------------------------
 //  Braucht: State, Flow, Events, I18n, Overlays     Bietet: Input.init()
 //
-//  Ein einziger delegierter Klick-Hörer auf dem Spielfeld statt
-//  Neu-Bindung nach jedem Zug (7.0.0 band nach jedem innerHTML alle
-//  Karten erneut). Die Auswahl ist ein Datensatz {source, index},
-//  kein DOM-Element – sie überlebt jedes Neuzeichnen.
+//  Ein einziger delegierter Klick-Hörer auf dem Spielfeld (keine
+//  Neu-Bindung nach jedem Zug). Die Auswahl ist ein Datensatz
+//  {source, index}, kein DOM-Element – sie überlebt jedes Neuzeichnen.
 //
-//  Bedienregeln (wie 7.0.0):
+//  Bedienregeln:
 //    • Karte in Hand / Stock / eigener Ablage antippen → wählen,
 //      nochmals antippen → abwählen.
 //    • Baustapel antippen (mit Auswahl) → legen.
@@ -17,8 +16,7 @@
 //      andere Auswahl → dort ablegen; nichts gewählt → oberste Karte wählen.
 //    • Nachziehstapel: ohne Funktion.
 //    • Langes Drücken (1 s) auf Ablagestapel (beide Seiten) → Inhalt.
-//  Nur Karten im EIGENEN Bereich sind wählbar (7.0.0 ließ auch
-//  KI-Handkarten „wählen").
+//  Nur Karten im EIGENEN Bereich sind wählbar.
 // ================================================================
 
 const Input = {

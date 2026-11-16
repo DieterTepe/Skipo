@@ -1,15 +1,15 @@
 // ================================================================
-//  core-store.js  –  Skipo 7.0.1   Namensraum: Store
+//  core-store.js  –  Skipo 7.0.4   Namensraum: Store
 //  EIN ZUGANG ZU localStorage
 // ----------------------------------------------------------------
-//  Braucht: nichts        Bietet: Store.get / set / remove / migrate
+//  Braucht: nichts        Bietet: Store.get / set / remove / cleanup
 //
 //  Regel 5 der Architektur: Nirgendwo sonst wird localStorage
 //  angefasst. Alle Werte liegen als JSON unter dem Präfix
 //  "skipo.v1.". Ohne localStorage (Node-Tests, Privatmodus)
 //  arbeitet der Store still im Speicher weiter.
 //
-//  Schlüssel:  name · lang · speed · bg · nameSet · tuner
+//  Schlüssel:  name · lang · speed · bg · nameSet · level · planning · stats
 // ================================================================
 
 const Store = (function () {
@@ -60,34 +60,17 @@ const Store = (function () {
     },
 
     /**
-     * Einmalige Übernahme der alten 7.0.0-Schlüssel (skipbo-*).
-     * Nur wenn der neue Schlüssel noch fehlt; alte werden danach gelöscht.
+     * Überholte Schlüssel früherer Versionen löschen (beim Start). Es wird nichts
+     * mehr übernommen – nur aufgeräumt, damit keine Altdaten im Browser liegen bleiben.
      */
-    migrate() {
+    cleanup() {
       const b = backend();
       if (!b) return;
-      const alt = [
-        ['skipbo-lang',           'lang',    v => v],
-        ['skipbo-speed',          'speed',   v => parseInt(v, 10)],
-        ['skipbo-bg',             'bg',      v => JSON.parse(v)],
-        ['skipbo-name-set',       'nameSet', v => v === '1'],
-        ['skipbo_tuner_tracking', 'tuner',   v => JSON.parse(v)],
-      ];
-      for (const [oldKey, newKey, conv] of alt) {
-        try {
-          const raw = b.getItem(oldKey);
-          if (raw !== null) {
-            if (b.getItem(PREFIX + newKey) === null) {
-              const val = conv(raw);
-              if (val !== undefined && val !== null && !(typeof val === 'number' && isNaN(val))) {
-                this.set(newKey, val);
-              }
-            }
-            b.removeItem(oldKey);
-          }
-        } catch (e) { /* defekter Altwert – überspringen */ }
+      const obsolete = [PREFIX + 'tuner', 'skipbo-lang', 'skipbo-speed', 'skipbo-bg', 'skipbo-name-set',
+                        'skipbo_tuner_tracking', 'skipbo_observations'];
+      for (const key of obsolete) {
+        try { b.removeItem(key); } catch (e) { /* ignorieren */ }
       }
-      try { b.removeItem('skipbo_observations'); } catch (e) { /* ignorieren */ }
     }
   };
 })();

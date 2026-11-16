@@ -1,5 +1,5 @@
 // ================================================================
-//  ui-overlays.js  –  Skipo 7.0.1   Namensraum: Overlays
+//  ui-overlays.js  –  Skipo 7.0.4   Namensraum: Overlays
 //  EINSTELLUNGEN · DESIGN · SPRACHE · SPIELENDE · INFO-FENSTER
 // ----------------------------------------------------------------
 //  Braucht: State, Events, I18n, Settings, Tracking     Bietet: Overlays.*
@@ -26,7 +26,7 @@ const Overlays = {
       ov.querySelector('#input-name').placeholder      = I18n.t('phName');
       ov.querySelector('.speed-label').textContent     = I18n.t('speedLabel');
       ov.querySelector('#overlay-info').innerHTML      = I18n.t('rulesHtml');
-      // 7.0.3: KI-Schwierigkeit + KI-Planung
+      // KI-Schwierigkeit + KI-Planung
       ov.querySelector('#ki-level-label').textContent  = I18n.t('kiLevelLabel');
       ov.querySelector('#ki-plan-label').textContent   = I18n.t('kiPlanLabel');
       ov.querySelectorAll('#ki-level button').forEach(b => { b.textContent = I18n.t('kiLevel_' + b.dataset.v); });
@@ -83,7 +83,7 @@ const Overlays = {
       </div>
       <div class="speed-control-container">
         <span class="speed-label"></span>
-        <input type="range" class="speed-slider" id="speed-slider" min="0" max="20" step="1">
+        <input type="range" class="speed-slider" id="speed-slider" min="0" max="2" step="0.1">
         <span class="speed-label" id="speed-value"></span>
       </div>`;
       document.body.appendChild(ov);
@@ -94,9 +94,9 @@ const Overlays = {
           Settings.set('name', newName);
           I18n.say('nameChanged', newName);
         }
-        Settings.set('speed', parseInt(ov.querySelector('#speed-slider').value, 10));
+        Settings.set('speed', parseFloat(ov.querySelector('#speed-slider').value));
         Settings.set('nameSet', true);
-        // 7.0.3: KI-Schwierigkeit + KI-Planung (gilt ab dem nächsten KI-Zug)
+        // KI-Schwierigkeit + KI-Planung (gilt ab dem nächsten KI-Zug)
         const level = this.kiChoice('ki-level'), plan = this.kiChoice('ki-plan');
         if (level !== Settings.level || plan !== Settings.planning) {
           Settings.set('level', level);
@@ -111,17 +111,22 @@ const Overlays = {
         this.kiSelect(seg.id, b.dataset.v);
       }));
       ov.querySelector('#speed-slider').addEventListener('input', e => {
-        ov.querySelector('#speed-value').textContent = `${e.target.value}s`;
+        ov.querySelector('#speed-value').textContent = this.speedText(e.target.value);
       });
       ov.querySelector('#btn-schliessen').addEventListener('click', () => this.hideSettings());
       this.texts();
     }
     ov.querySelector('#input-name').value        = Settings.name;
     ov.querySelector('#speed-slider').value      = Settings.speed;
-    ov.querySelector('#speed-value').textContent = `${Settings.speed}s`;
+    ov.querySelector('#speed-value').textContent = this.speedText(Settings.speed);
     this.kiSelect('ki-level', Settings.level);
     this.kiSelect('ki-plan',  Settings.planning);
     ov.style.display = 'block';
+  },
+
+  /** Tempo-Anzeige mit einer Nachkommastelle in der Schreibweise der Sprache (0,5 s / 0.5 s). */
+  speedText(value) {
+    return Number(value).toLocaleString(Settings.lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' s';
   },
 
   /** Auswahl in einer Schaltergruppe markieren (noch nicht gespeichert – erst „Übernehmen"). */
@@ -270,15 +275,13 @@ const Overlays = {
   },
 
   // ----------------------------------------------------------------
-  // SPIELENDE (Ergebnis + Tuner-Auswertung)
+  // SPIELENDE (Ergebnis + Vergleich beider Seiten)
   // ----------------------------------------------------------------
 
   showEnd(result) {
-    const winnerName = result.winner === 'ai' ? I18n.t('ai') : Settings.name;
-    const loserName  = result.loser  === 'ai' ? I18n.t('ai') : Settings.name;
-    const spiele     = Tracking.stats.spiele;
-    const ready      = spiele >= 5;
-    const btnLabel   = ready ? I18n.t('btnTunerReady', spiele) : I18n.t('btnTunerWait', 5 - spiele);
+    const esc        = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const winnerName = result.winner === 'ai' ? I18n.t('ai') : esc(Settings.name);
+    const loserName  = result.loser  === 'ai' ? I18n.t('ai') : esc(Settings.name);
 
     const overlay = document.createElement('div');
     overlay.id = 'end-game-overlay';
@@ -293,10 +296,6 @@ const Overlays = {
       ${this.compareHTML()}
       <div class="end-buttons">
         <button id="btn-restart" class="end-btn end-btn-restart">${I18n.t('btnNewGame')}</button>
-        <button id="btn-auswertung" class="end-btn end-btn-tuner ${ready ? 'ready' : ''}">${btnLabel}</button>
-      </div>
-      <div id="tuner-panel" style="display:none;">
-        <div class="tuner-scroll">${this.tunerAnalysisHTML()}</div>
       </div>
     </div>`;
     document.body.appendChild(overlay);
@@ -306,15 +305,9 @@ const Overlays = {
       overlay.remove();
       location.reload();
     });
-    overlay.querySelector('#btn-auswertung').addEventListener('click', e => {
-      e.preventDefault();
-      if (!ready) return;
-      const panel = overlay.querySelector('#tuner-panel');
-      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-    });
   },
 
-  /** Vergleich beider Seiten: dieses Spiel + Durchschnitt (7.0.2). */
+  /** Vergleich beider Seiten: dieses Spiel + Durchschnitt der letzten Spiele. */
   compareHTML() {
     const g = Tracking.last;
     if (!g) return '';
@@ -340,64 +333,6 @@ const Overlays = {
       html += table(avg.human, avg.ai, I18n.t('cmpAvgTitle', avg.games), winsRow);
     }
     return html + '</div>';
-  },
-
-  /** 5-Spiele-Tuner-Auswertung als HTML (Schwellen 1:1 aus 6.6.0). */
-  tunerAnalysisHTML() {
-    const s = Tracking.stats;
-    if (s.spiele < 5) {
-      return `<p class="ta-wait">${I18n.t('taNeedMore', 5 - s.spiele)}<br>${I18n.t('taTotal')}: ${s.spiele}/5</p>`;
-    }
-
-    const jokerRate      = s.jokerGespielt / s.spiele;
-    const jokerWasteRate = s.jokerGespielt > 0 ? s.jokerVerschwendet / s.jokerGespielt : 0;
-    let jokerStatus, jokerEmoji, jokerHinweis;
-    if (jokerWasteRate > 0.4) { jokerStatus = '🔴'; jokerEmoji = I18n.t('taJokerBad'); jokerHinweis = I18n.t('taJokerBadTip'); }
-    else if (jokerRate < 1)   { jokerStatus = '🟡'; jokerEmoji = I18n.t('taJokerFew'); jokerHinweis = I18n.t('taJokerFewTip'); }
-    else                      { jokerStatus = '🟢'; jokerEmoji = I18n.t('taJokerOk');  jokerHinweis = I18n.t('taJokerOkTip'); }
-
-    const hilfeRate = s.gegnerhilfe / s.spiele;
-    let hilfeStatus, hilfeEmoji, hilfeHinweis;
-    if (hilfeRate > 3)        { hilfeStatus = '🔴'; hilfeEmoji = I18n.t('taHelpBad');  hilfeHinweis = I18n.t('taHelpBadTip'); }
-    else if (hilfeRate > 1.5) { hilfeStatus = '🟡'; hilfeEmoji = I18n.t('taHelpSome'); hilfeHinweis = I18n.t('taHelpSomeTip'); }
-    else                      { hilfeStatus = '🟢'; hilfeEmoji = I18n.t('taHelpOk');   hilfeHinweis = I18n.t('taHelpOkTip'); }
-
-    const stockVerpasstRate = s.stockZuege > 0 ? s.stockVerpasst / (s.stockZuege + s.stockVerpasst) : 0;
-    let stockStatus, stockEmoji, stockHinweis;
-    if (stockVerpasstRate > 0.3)       { stockStatus = '🔴'; stockEmoji = I18n.t('taStockBad');  stockHinweis = I18n.t('taStockBadTip'); }
-    else if (stockVerpasstRate > 0.15) { stockStatus = '🟡'; stockEmoji = I18n.t('taStockSome'); stockHinweis = I18n.t('taStockSomeTip'); }
-    else                               { stockStatus = '🟢'; stockEmoji = I18n.t('taStockOk');   stockHinweis = I18n.t('taStockOkTip'); }
-
-    const komboRate = s.komboZuege / s.spiele;
-    let komboStatus, komboEmoji, komboHinweis;
-    if (komboRate < 1)      { komboStatus = '🟡'; komboEmoji = I18n.t('taComboFew');  komboHinweis = I18n.t('taComboFewTip'); }
-    else if (komboRate > 5) { komboStatus = '🟡'; komboEmoji = I18n.t('taComboMany'); komboHinweis = I18n.t('taComboManyTip'); }
-    else                    { komboStatus = '🟢'; komboEmoji = I18n.t('taComboOk');   komboHinweis = I18n.t('taComboOkTip'); }
-
-    const handProZug = s.handAbgebaut / s.spiele;
-    let handStatus, handEmoji, handHinweis;
-    if (handProZug < 8) { handStatus = '🟡'; handEmoji = I18n.t('taHandFew'); handHinweis = I18n.t('taHandFewTip'); }
-    else                { handStatus = '🟢'; handEmoji = I18n.t('taHandOk');  handHinweis = I18n.t('taHandOkTip'); }
-
-    const winRate = Math.round((s.siegerKI / s.spiele) * 100);
-
-    const box = (status, icon, titleKey, head, body, hinweis) => `
-      <div class="ta-box">
-        <b>${status} ${icon} ${I18n.t(titleKey)}:</b> ${head}<br>
-        ${body}<br>
-        <span class="ta-hint">${hinweis}</span>
-      </div>`;
-
-    return `
-    <div class="ta-wrap">
-      <p class="ta-header">${I18n.t('taHeader', s.spiele, winRate)}</p>
-      ${box(jokerStatus, '🃏', 'taJokerTitle', jokerEmoji, `${I18n.t('taPlayed')}: ${s.jokerGespielt}× · ${I18n.t('taWasted')}: ${s.jokerVerschwendet}×`, jokerHinweis)}
-      ${box(hilfeStatus, '🛡️', 'taHelpTitle',  hilfeEmoji, `${I18n.t('taOverall')}: ${s.gegnerhilfe}× (Ø ${hilfeRate.toFixed(1)}/${I18n.t('taPerGame')})`, hilfeHinweis)}
-      ${box(stockStatus, '🗃️', 'taStockTitle', stockEmoji, `${I18n.t('taLaid')}: ${s.stockZuege}× · ${I18n.t('taMissed')}: ${s.stockVerpasst}×`, stockHinweis)}
-      ${box(komboStatus, '🔗', 'taComboTitle', komboEmoji, `${I18n.t('taDiscToBuild')}: ${s.komboZuege}× (Ø ${komboRate.toFixed(1)}/${I18n.t('taPerGame')})`, komboHinweis)}
-      ${box(handStatus,  '✋', 'taHandTitle',  handEmoji,  `${I18n.t('taHandToBuild')}: ${s.handAbgebaut}× (Ø ${handProZug.toFixed(1)}/${I18n.t('taPerGame')})`, handHinweis)}
-      <p class="ta-footer">${I18n.t('taFooter')}</p>
-    </div>`;
   },
 
   // ----------------------------------------------------------------

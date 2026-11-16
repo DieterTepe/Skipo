@@ -1,18 +1,21 @@
 // ================================================================
-//  ai-eval.js  –  Skipo 7.0.1   Namensraum: AI.Eval
-//  BEWERTUNG & SCORING (getunte Heuristik, nutzt KONFIG)
+//  ai-eval.js  –  Skipo 7.0.4   Namensraum: AI.Eval
+//  BEWERTUNG DER EINZELZÜGE (Heuristik, nutzt KONFIG)
 // ----------------------------------------------------------------
 //  Braucht: AI, KONFIG, State, Rules     Bietet: AI.Eval.candidates()
 //
-//  Das Herz der vom Tuner optimierten KI. Alle Bauzug-Kandidaten
-//  werden mit den KONFIG-SCORE-Parametern bewertet und sortiert.
-//  Die Formeln sind 1:1 aus 6.6.0 übernommen – jede Änderung
-//  verschiebt die getunte Balance.
+//  Alle Bauzug-Kandidaten, die der Planer übrig lässt, werden mit den
+//  KONFIG-Werten bewertet und sortiert. Die KI spielt jeden Kandidaten,
+//  der übrig bleibt – die Bewertung bestimmt nur die Reihenfolge und
+//  (in „Leicht") den Joker-Einsatz. Die Formeln sind bewährt und
+//  bleiben unverändert, damit die Stufen ihre Stärke behalten.
 //
-//  Dokumentierte Eigenheiten (bewusst erhalten):
-//    • SCORE_44 wird berechnet, aber nirgends verwendet.
-//    • SCORE_49 hat keinen Score-Effekt (war schon im Original
-//      wirkungslos; das zugehörige Flag ist entfallen).
+//  Was eine Stufe ausmacht, passiert in filter():
+//    Mittel/Schwer – Joker nie über die Heuristik; Blockade
+//                    (applyBlockade: Züge verweigern, die dem Gegner
+//                    die Stockkarte öffnen).
+//    Schwer        – zusätzlich größerer Sicherheitsabstand und
+//                    Handkarte vor Ablagekarte.
 // ================================================================
 
 AI.Eval = {
@@ -28,10 +31,6 @@ AI.Eval = {
     const me        = State.player(player);
     const stockSize = me.stock.length;
     const stockTop  = me.stock.slice(-1)[0]?.value;
-
-    // Nagel44: berechnet, aber wie im Original ohne Wirkung
-    const blockedStock = Math.max(0, 16 - State.player('human').stock.length);
-    const Nagel44      = KONFIG.SCORE_44 * Math.sqrt(blockedStock);   // eslint-disable-line no-unused-vars
 
     let candidates = [];
     candidates = candidates.concat(this.scoreHand(player, stockSize, stockTop));
@@ -138,7 +137,7 @@ AI.Eval = {
     return candidates;
   },
 
-  /** Ablagestapelkarten auf Baustapel bewerten (inkl. Tiefenanalyse). */
+  /** Oberste Ablagestapelkarten auf Baustapel bewerten. */
   scoreDiscard(player) {
     const candidates = [];
     const me         = State.player(player);
@@ -148,7 +147,6 @@ AI.Eval = {
       if (pile.length === 0) return;
       const card = pile[pile.length - 1];
 
-      // Ebene 0: oberste Karte
       builds.forEach((buildPile, buildIndex) => {
         if (!Rules.isValidBuild(card, buildIndex)) return;
 
@@ -174,12 +172,6 @@ AI.Eval = {
 
         candidates.push({ sourceType: 'discard', sourceIndex: discardIndex, card, buildPileIndex: buildIndex, score });
       });
-
-      // Ebenen 1–N: Tiefenanalyse
-      if (KONFIG.DISCARD_LOOKAHEAD_DEPTH > 1 && pile.length > 1) {
-        const deep = AI.Analysis.discardComboDepth(player, discardIndex);
-        if (deep.length > 0) candidates.push(...deep);
-      }
     });
 
     return candidates;
@@ -201,19 +193,17 @@ AI.Eval = {
     return unique;
   },
 
-  /** Joker-Filter + dynamische Prioritäten + Blockade-Boni; sortiert. */
+  /** Stufen-Regeln (Joker, Blockade), Joker-Schwelle, dynamische Prioritäten; sortiert. */
   filter(candidates, player, nagel40, nagel41, nagel42) {
     if (candidates.length === 0) return [];
 
+    // Mittel/Schwer: Joker nie über die Heuristik (nur Planer-Ketten und Stock), dann Blockade
     const T = AI.taktik();
-    const nJok = State.player('ai').hand.filter(c => c.type === 'joker').length;
-    if (T && T.JOKER_HEURISTIC === false && !(T.JOKER_SURPLUS > 0 && nJok >= T.JOKER_SURPLUS)) {
+    if (T) {
       candidates = candidates.filter(m => m.card.type !== 'joker');
       if (candidates.length === 0) return [];
+      this.applyBlockade(candidates, T);
     }
-    if (T) this.applyThreat(candidates, T);
-    if (T && T.CHAIN_AVOID) this.applyChain(candidates, T);
-    if (T && (T.IDLE_HOLD || T.IDLE_OWN_PATH > 0)) this.applyHold(candidates, T);
 
     const avgScore         = candidates.reduce((s, m) => s + m.score, 0) / candidates.length;
     const dynamicThreshold = avgScore * nagel40;
@@ -231,12 +221,8 @@ AI.Eval = {
       if (onlyJoker && bestJokerScore < nagel41) return [];
     }
 
-    const enemyAnalysis = AI.Analysis.enemyTarget('human');
+    const enemyAnalysis = AI.Analysis.predictEnemyStock('human');
     const priorities    = this.dynamicPriorities();
-    const blockTargets  = AI.Analysis.discardPatterns();
-    if (KONFIG.DEBUG_N3 && blockTargets.length > 0) {
-      console.log(`📌N3 🎯 Blockade-Ziele: ${blockTargets.map(t => `${t.value}(${(t.confidence * 100).toFixed(0)}%)`).join(', ')}`);
-    }
 
     const humanStock = State.player('human').stock;
     const series     = AI.Analysis.consecutiveDiscards('human');
@@ -251,129 +237,44 @@ AI.Eval = {
         move.score += Math.round(KONFIG.SCORE_35 * priorities.seriesDisrupt);
       }
 
-      const blockBonus = AI.Analysis.blockScore(move.card, blockTargets);
-      if (blockBonus > 0) {
-        move.score += blockBonus;
-        if (KONFIG.DEBUG_N4) console.log(`📌N4 🛡️ Blockade-Bonus für ${move.card.value}: +${blockBonus}`);
-      }
-
       move.score = Math.round(move.score * priorities.riskTaking);
     });
 
-    if (T && T.PREFER_SRC) {
-      // 7.0.3-Versuch: gleiche Karte auf denselben Stapel → bevorzugte Quelle (Hand = mehr Nachziehen)
+    if (T && T.PREFER_HAND) {
+      // Schwer: dieselbe Karte liegt in der Hand UND oben auf einer Ablage → Handkarte zuerst (mehr Nachziehen)
       for (const m of filtered) {
-        if (m.sourceType !== T.PREFER_SRC || m.card.type === 'joker') continue;
-        const twin = filtered.find(o => o !== m && o.buildPileIndex === m.buildPileIndex && o.card.type !== 'joker' &&
-                                        o.card.value === m.card.value && o.sourceType !== 'stock' && o.sourceType !== T.PREFER_SRC);
+        if (m.sourceType !== 'hand') continue;
+        const twin = filtered.find(o => o !== m && o.sourceType === 'discard' &&
+                                        o.buildPileIndex === m.buildPileIndex && o.card.value === m.card.value);
         if (twin && twin.score >= m.score) m.score = twin.score + 1;
       }
     }
     const result = filtered.sort((a, b) => b.score - a.score);
-    return T ? result.filter(m => !m.avoid) : result;
+    return result.filter(m => !m.avoid);
   },
 
   /**
-   * Blockade-Taktik (7.0.2): Kandidaten nach ihrer Wirkung auf die sichtbare
-   * Gegner-Stockkarte V bewerten – öffnen (V-1) bestrafen, zudecken (V) belohnen.
+   * Blockade (Mittel/Schwer): Züge verweigern, die dem Gegner den Weg zu seiner
+   * SICHTBAREN Stockkarte V öffnen. Eigene Stockzüge werden nie verweigert.
+   *   Abstand 1 (Karte V-1): verweigern, außer die KI kann selbst mit V oder Joker zudecken
+   *   Abstand 2 (Karte V-2): verweigern, wenn die Brücke V-1 beim Gegner sichtbar liegt
+   *                          oder der Sicherheitsabstand T.AVOID_DIST ≥ 2 ist
+   *   Abstand 3..AVOID_DIST: verweigern
    */
-  applyThreat(candidates, T) {
+  applyBlockade(candidates, T) {
     const th = AI.Analysis.threat();
     if (!th) return;
-    const V     = th.value;
-    const piles = State.game.buildPiles;
-    const me    = State.player('ai');
-    const w     = th.oppStock <= T.ENDGAME_LIMIT
-      ? 1 + (T.ENDGAME_FACTOR - 1) * (T.ENDGAME_LIMIT + 1 - th.oppStock) / T.ENDGAME_LIMIT
-      : 1;
-    const canFollow = me.hand.some(c => (T.FOLLOW_JOKER && c.type === 'joker') || c.value === V) ||
-                      me.discards.some(d => d.length > 0 && d[d.length - 1].value === V);
+    const V  = th.value;
+    const me = State.player('ai');
+    const canCover = me.hand.some(c => c.type === 'joker' || c.value === V) ||
+                     me.discards.some(d => d.length > 0 && d[d.length - 1].value === V);
 
-    // 7.0.3-Versuche: Wettlauf (eigener Stock klein → nicht mehr verweigern), Abstand, Rundlauf 12→1
-    const race = me.stock.length <= (T.AVOID_OWN_MIN || 0);
-    const dist = T.AVOID_DIST || 1;
     for (const m of candidates) {
-      const pile = piles[m.buildPileIndex];
-      const eff  = m.card.type === 'joker' ? Rules.nextNeeded(pile) : m.card.value;
-      const gap  = T.AVOID_WRAP ? (V - eff + 12) % 12 : V - eff;   // 1 = öffnet direkt
-      if (race) {
-        /* kein Verzicht */
-      } else if (dist >= 2 && gap >= 2 && gap <= dist && !(gap === 2 && th.bridge)) {
-        m.avoid = m.sourceType !== 'stock' && th.oppStock <= T.AVOID_OPEN_LIMIT;
-      } else if (T.AVOID_WRAP && gap === 1 && eff !== V - 1) {
-        // Rundlauf: 12 räumt den Stapel → offen für Gegner-Stockkarte 1
-        const stockOk = m.sourceType !== 'stock' || th.oppStock <= T.AVOID_STOCK_LIMIT;
-        m.avoid = T.AVOID_OPEN && !canFollow && stockOk && th.oppStock <= T.AVOID_OPEN_LIMIT;
-      }
-      if (race) continue;
-      if (eff === V - 1) {
-        let pen = T.OPEN_PENALTY * w;
-        if (m.sourceType === 'stock') pen *= T.OPEN_STOCKMOVE_FACTOR;
-        if (canFollow)                pen *= T.OPEN_FOLLOWUP_FACTOR;
-        m.score -= pen;
-        // Verzicht: öffnender Zug ohne eigene Deckkarte wird gar nicht gespielt
-        const stockOk = m.sourceType !== 'stock' || th.oppStock <= T.AVOID_STOCK_LIMIT;
-        m.avoid = T.AVOID_OPEN && !canFollow && stockOk && th.oppStock <= T.AVOID_OPEN_LIMIT;
-      } else if (eff === V) {
-        m.score += T.COVER_BONUS * w;
-      } else if (eff === V - 2 && th.bridge) {
-        m.score -= T.SECOND_PENALTY * w;
-        m.avoid = T.AVOID_SECOND && m.sourceType !== 'stock' && th.oppStock <= T.AVOID_OPEN_LIMIT;
-      } else if (T.AVOID_DISCARD_TOPS && m.sourceType !== 'stock' && th.tops.includes(eff + 1)) {
-        m.avoid = true;
-      }
-    }
-  },
-
-  /**
-   * Leerlaufzüge zurückhalten (7.0.3-Versuch): Züge aus Hand/Ablage, die nicht vom Planer
-   * kommen (kein Stockabbau, kein Hand-Leeren), bringen dem Gegner evtl. mehr als mir.
-   *   IDLE_HOLD     : 'all' = alle, 'hand' = nur Handkarten, 'discard' = nur Ablagekarten
-   *   IDLE_OWN_PATH : nur spielen, wenn der Stapel danach ≤ so viele Karten vor MEINER Stockkarte steht
-   */
-  applyHold(candidates, T) {
-    const me   = State.player('ai');
-    const sTop = me.stock[me.stock.length - 1];
-    const S    = sTop && sTop.type !== 'joker' ? parseInt(sTop.value, 10) : null;
-    for (const m of candidates) {
-      if (m.avoid || m.sourceType === 'stock') continue;
-      if (T.IDLE_HOLD === 'all' || T.IDLE_HOLD === m.sourceType) { m.avoid = true; continue; }
-      if (T.IDLE_OWN_PATH > 0 && S !== null) {
-        const pile = State.game.buildPiles[m.buildPileIndex];
-        const eff  = m.card.type === 'joker' ? Rules.nextNeeded(pile) : parseInt(m.card.value, 10);
-        const d    = (S - eff + 12) % 12;          // Karten, die danach noch bis zu meiner Stockkarte fehlen (+1)
-        if (d === 0 || d > T.IDLE_OWN_PATH) m.avoid = true;
-      }
-    }
-  },
-
-  /**
-   * Kettenbedrohung (7.0.3): Zug verweigern, wenn der Gegner danach mit seinen
-   * sichtbaren Karten eine Kette legen kann, die ohne den Zug nicht möglich wäre.
-   *   CHAIN_STOCK : Stockkarte des Gegners wird erst durch den Zug erreichbar
-   *   CHAIN_LIMIT : Kette ≥ Grenze UND um ≥ CHAIN_DELTA länger als vorher (0 = aus)
-   */
-  applyChain(candidates, T) {
-    const human = State.player('human');
-    if (human.stock.length > T.CHAIN_OPP_STOCK_LIMIT) return;
-    const me   = State.player('ai');
-    const base = AI.Analysis.chainThreat(AI.Analysis.buildNeeds());
-    for (const m of candidates) {
-      if (m.avoid) continue;
-      if (T.CHAIN_SKIP_STOCKMOVE && m.sourceType === 'stock') continue;
-      const pile = State.game.buildPiles[m.buildPileIndex];
-      const eff  = m.card.type === 'joker' ? Rules.nextNeeded(pile) : parseInt(m.card.value, 10);
-      const aft  = AI.Analysis.chainThreat(AI.Analysis.buildNeeds(m.buildPileIndex, eff));
-      let bad = false;
-      if (T.CHAIN_STOCK && aft.reach && !base.reach) bad = true;
-      if (T.CHAIN_LIMIT > 0 && aft.count >= T.CHAIN_LIMIT && aft.count - base.count >= T.CHAIN_DELTA) bad = true;
-      if (bad && T.CHAIN_ALLOW_COVER) {
-        // eigene Deckkarte (passend zur Stockkarte des Gegners) vorhanden → trotzdem spielen
-        const sTop = human.stock[human.stock.length - 1];
-        const V = sTop && sTop.type !== 'joker' ? parseInt(sTop.value, 10) : -1;
-        if (V > 0 && me.hand.some(c => c.type === 'joker' || parseInt(c.value, 10) === V)) bad = false;
-      }
-      if (bad) m.avoid = true;
+      if (m.sourceType === 'stock') continue;
+      const gap = V - m.card.value;                  // Joker sind hier schon aussortiert
+      if (gap === 1)                           m.avoid = !canCover;
+      else if (gap === 2)                      m.avoid = th.bridge || T.AVOID_DIST >= 2;
+      else if (gap >= 3 && gap <= T.AVOID_DIST) m.avoid = true;
     }
   },
 

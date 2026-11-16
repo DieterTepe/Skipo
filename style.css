@@ -1,12 +1,10 @@
 /* ============================================================
    Skipo (Skip-Bo Mobile) - Stylesheet  (style.css)
-   Version 7.0.1 (04.09.2026)
-   Basis: style.css 7.0.0 unveraendert (Karten, Felder, Farben,
-   Animationen, Design-Bedienfeld). Neu am Ende der Datei: alles,
-   was 7.0.0 noch als Inline-Style im HTML oder per JS in den
-   <head> injizierte (Menue-Button, Schnellmenue, Statuszeile,
-   Stock-Rahmen, Einstellungen-Fenster, Endscreen, Sprachwahl).
-   Diese Datei MUSS direkt neben SkipBo_7_0_1.html liegen.
+   Version 7.0.4 (15.11.2026)
+   Alle Stile des Spiels in dieser einen Datei: Karten, Felder,
+   Farben, Animationen, Design-Bedienfeld, Menue, Statuszeile,
+   Einstellungen-Fenster, Endscreen mit Vergleich, Sprachwahl.
+   Kein Stil steht im HTML oder wird per JavaScript erzeugt.
    ============================================================ */
 
 *, *::before, *::after {
@@ -254,8 +252,6 @@ html, body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .card-corner.top-left     { top: 6px;    left:  7px; }
-.card-corner.top-right    { top: 6px;    right: 7px; }
-.card-corner.bottom-left  { bottom: 6px; left:  7px; transform: rotate(180deg); }
 .card-corner.bottom-right { bottom: 6px; right: 7px; transform: rotate(180deg); }
 
 /* SKIP-BO-Logo (Joker-Karte) */
@@ -354,11 +350,6 @@ html, body {
 /* ============================================================ */
 /* ANIMATIONEN                                                   */
 /* ============================================================ */
-@keyframes card-glow {
-  from { box-shadow: 0 0  5px #1565C0; }
-  to   { box-shadow: 0 0 15px #0D47A1; }
-}
-
 @keyframes neon-pulse {
   from {
     box-shadow:
@@ -376,11 +367,6 @@ html, body {
   0%   { transform: translateY(   0); }
   50%  { transform: translateY(-20px); }
   100% { transform: translateY(   0); }
-}
-
-@keyframes card-drop {
-  0%   { transform: translateY(-40px) rotateY(15deg) rotateX(10deg); }
-  100% { transform: translateY(   0)  rotateY( 0deg) rotateX( 0deg); }
 }
 
 /* ============================================================ */
@@ -421,10 +407,6 @@ html, body {
     neon-pulse 1.5s infinite alternate,
     card-float 2s   infinite;
   transition: all 0.3s ease;
-}
-
-.field.card.placed {
-  animation: card-drop 1s forwards;
 }
 
 .field.card {
@@ -587,7 +569,7 @@ html, body {
 
 
 /* ============================================================ */
-/* 7.0.1 – MENÜ-BUTTON & SCHNELLMENÜ (vorher Inline im HTML)     */
+/* MENÜ-BUTTON & SCHNELLMENÜ                                  */
 /* ============================================================ */
 #menu-btn {
   position:      fixed;
@@ -628,7 +610,7 @@ html, body {
 .qm-btn-close { color: rgba(255,100,100,0.9); }
 
 /* ============================================================ */
-/* 7.0.1 – STATUSZEILE (vorher per JS gesetzt)                   */
+/* STATUSZEILE                                                */
 /* ============================================================ */
 #status-text {
   font-size:   1.5rem;
@@ -637,7 +619,7 @@ html, body {
 }
 
 /* ============================================================ */
-/* 7.0.1 – STOCK-RAHMEN AKTIVER SPIELER (vorher per JS injiziert) */
+/* STOCK-RAHMEN AKTIVER SPIELER                               */
 /* ============================================================ */
 .animated-stock-border {
   border:        4.5px solid;
@@ -656,7 +638,7 @@ html, body {
 }
 
 /* ============================================================ */
-/* 7.0.1 – EINSTELLUNGEN-FENSTER (vorher per JS injiziert)       */
+/* EINSTELLUNGEN-FENSTER                                      */
 /* ============================================================ */
 #overlay-container {
   position:      fixed;
@@ -727,7 +709,7 @@ html, body {
   left:          50%;
   transform:     translateX(-50%);
   width:         84%;
-  bottom:        246px;       /* 7.0.3: Platz für KI-Auswahl + Tempo */
+  bottom:        246px;       /* Platz für KI-Auswahl + Tempo */
   background:    #eee;
   color:         black;
   overflow-y:    auto;
@@ -737,7 +719,7 @@ html, body {
 #overlay-info h1, #overlay-info h2, #overlay-info h3 { color: darkred; }
 #overlay-info p   { color: black; margin-bottom: 10px; }
 #overlay-info li  { color: blue; }
-/* 7.0.3 – KI-Schwierigkeit + KI-Planung (Schaltergruppen) */
+/* KI-Schwierigkeit + KI-Planung (Schaltergruppen)            */
 .ki-control-container {
   position:       absolute;
   bottom:         84px;
@@ -838,7 +820,7 @@ html, body {
 }
 
 /* ============================================================ */
-/* 7.0.1 – SPIELENDE (vorher Inline-Styles im JS)                */
+/* SPIELENDE                                                  */
 /* ============================================================ */
 .end-overlay {
   position:         fixed;
@@ -908,34 +890,9 @@ html, body {
   font-size:  0.9em;
   cursor:     pointer;
 }
-.end-btn-tuner {
-  background: rgba(255,255,255,0.1);
-  color:      #8b9bb4;
-  font-size:  0.85em;
-  cursor:     default;
-}
-.end-btn-tuner.ready {
-  background: linear-gradient(135deg, #00d4ff, #00b36b);
-  color:      #000;
-  cursor:     pointer;
-}
-.tuner-scroll {
-  background:    rgba(0,0,0,0.3);
-  border:        1px solid rgba(0,212,255,0.2);
-  border-radius: 10px;
-  padding:       14px;
-  max-height:    340px;
-  overflow-y:    auto;
-}
-.ta-wrap   { font-size: 0.85em; line-height: 1.6; }
-.ta-header { text-align: center; color: #ffd700; font-weight: bold; margin-bottom: 12px; }
-.ta-box    { margin-bottom: 10px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 6px; }
-.ta-hint   { color: #00d4ff; }
-.ta-footer { color: #8b9bb4; font-size: 0.85em; margin-top: 10px; text-align: center; }
-.ta-wait   { color: #aaa; text-align: center; }
 
 /* ============================================================ */
-/* 7.0.1 – SPRACHWAHL (vorher Inline-Styles im JS)               */
+/* SPRACHWAHL                                                 */
 /* ============================================================ */
 .lang-overlay {
   position:        fixed;
@@ -984,7 +941,7 @@ html, body {
 }
 
 /* ============================================================ */
-/* 7.0.2 – VERGLEICH BEIDER SEITEN IM ENDSCREEN                 */
+/* VERGLEICH BEIDER SEITEN IM ENDSCREEN                       */
 /* ============================================================ */
 .cmp-box   { text-align: left; font-size: 0.5em; font-weight: normal; line-height: 1.5; margin-bottom: 14px; }
 .cmp-level {

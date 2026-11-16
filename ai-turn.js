@@ -1,23 +1,25 @@
 // ================================================================
-//  ai-turn.js  –  Skipo 7.0.1   Namensraum: AI
+//  ai-turn.js  –  Skipo 7.0.4   Namensraum: AI
 //  KI-RUNDENABLAUF
 // ----------------------------------------------------------------
-//  Braucht: KONFIG, KI_PLANNER, State, Rules, Events, I18n, Clock
-//           + AI.Planner / AI.Eval / AI.Analysis (eigene Dateien)
+//  Braucht: KONFIG, KI_PLANNER, KI_STUFEN, Settings, State, Rules,
+//           Events, I18n, Clock + AI.Planner / AI.Eval / AI.Analysis
 //  Bietet:  AI.takeTurn()  (+ Hilfen für die Unter-Namensräume)
 //
-//  Drei Phasen wie in 6.6.0:
+//  Drei Phasen:
 //    prepare()      – Ziehen, Gegner-Vorhersage, Blockade-Marker
 //    executeMoves() – Joker im Stock, Zugketten-Planer, Heuristik
-//    finish()       – Pflicht-Ablegen (Joker-Analyse), Nachziehen
+//    finish()       – Joker am Zugende, GENAU EINE Ablage, Nachziehen
 //
-//  Kein DOM. Die KI spricht nur über Ereignisse (msg, ai:predict,
-//  ai:note) und Rules-Aufrufe. Der Spielerwechsel gehört Flow.
+//  Kein DOM. Die KI spricht nur über Ereignisse (msg, ai:predict)
+//  und Rules-Aufrufe. Der Spielerwechsel gehört Flow.
 //
 //  Wächter: AI.over() ist an JEDER Stelle die Frage „darf ich noch?"
 //  (Spiel beendet oder Sieger steht fest). AI.busy verhindert
-//  parallele Wurzelstarts (Geister-KI). Die Stock-Prioritäts-
-//  Rekursion wird awaited.
+//  parallele Starts (Geister-KI).
+//
+//  Stufen: AI.taktik() liefert den Wertesatz der gewählten
+//  Schwierigkeit (KI_STUFEN) – null bei „Leicht" (keine Blockade).
 // ================================================================
 
 const AI = {
@@ -28,31 +30,19 @@ const AI = {
     return State.turn.over || Rules.winner() !== null;
   },
 
-  /**
-   * Taktik-Werte für die gewählte Schwierigkeit (Settings.level) → Objekt, sonst null.
-   *   hard   = KI_TAKTIK            medium = KI_TAKTIK + KI_STUFEN.medium
-   *   easy   = null (Taktik aus)    ENABLED:false in der Datei schaltet immer aus
-   */
+  /** Taktik-Werte der gewählten Schwierigkeit; null = „Leicht" (ohne Blockade). */
   taktik() {
-    if (typeof KI_TAKTIK === 'undefined' || !KI_TAKTIK || !KI_TAKTIK.ENABLED) return null;
-    const level = (typeof Settings !== 'undefined' && Settings.level) || 'hard';
-    const over  = (level !== 'hard' && typeof KI_STUFEN !== 'undefined') ? KI_STUFEN[level] : null;
-    if (!over) return KI_TAKTIK;
-    if (over.ENABLED === false) return null;
-    return Object.assign({}, KI_TAKTIK, over);
+    const t = KI_STUFEN[Settings.level];
+    return t === undefined ? KI_STUFEN.hard : t;
   },
 
-  /** KI-Planung „Normal": Planer sieht nur die oberste eigene Stockkarte (gilt in jeder Stufe). */
+  /** KI-Planung „Normal": Die KI kennt vom eigenen Stock nur die oberste Karte. */
   fairStock() {
-    if (typeof KI_TAKTIK !== 'undefined' && KI_TAKTIK && KI_TAKTIK.PLANNER_FAIR_STOCK) return true;
-    return typeof Settings !== 'undefined' && Settings.planning === 'normal';
+    return Settings.planning === 'normal';
   },
 
   /** Statusmeldung (Schlüssel + Werte). */
   say(key, ...args) { I18n.say(key, ...args); },
-
-  /** Beobachtung für das Tuner-Tracking. */
-  note(type, data) { Events.emit('ai:note', Object.assign({ type }, data)); },
 
   /** Anzeige-Bausteine (nur für Meldungen). */
   cardLabel(card) { return card.type === 'joker' ? I18n.t('jokerLabel') : `${card.value}`; },
@@ -67,29 +57,21 @@ const AI = {
   // HAUPTEINSTIEG
   // ----------------------------------------------------------------
 
-  /**
-   * takeTurn(depth) – kompletter KI-Zug. Kehrt zurück, wenn die KI
-   * fertig ist; den Wechsel zum Spieler macht Flow.
-   * @param {number} depth – Rekursionstiefe (Stock-Priorität), max. 15
-   */
-  async takeTurn(depth = 0) {
+  /** Kompletter KI-Zug. Kehrt zurück, wenn die KI fertig ist; den Wechsel zum Spieler macht Flow. */
+  async takeTurn() {
     if (this.over()) return;
-    if (depth === 0) {
-      if (this.busy) { console.warn('AI: zweiter Wurzelstart ignoriert'); return; }
-      this.busy = true;
-    }
+    if (this.busy) { console.warn('AI: zweiter Start ignoriert'); return; }
+    this.busy = true;
     try {
-      if (depth > 15) { console.warn('AI: max. Rekursionstiefe erreicht'); return; }
-
       await this.prepare();
       if (this.over()) return;
 
-      const restarted = await this.executeMoves(depth);
-      if (restarted || this.over()) return;
+      await this.executeMoves();
+      if (this.over()) return;
 
       await this.finish();
     } finally {
-      if (depth === 0) this.busy = false;
+      this.busy = false;
     }
   },
 
@@ -103,7 +85,7 @@ const AI = {
     await Clock.pause(0.8);
     if (this.over()) return;
 
-    const enemy = AI.Analysis.enemyTarget('human');
+    const enemy = AI.Analysis.predictEnemyStock('human');
 
     this.say('aiAnalyze');
     await Clock.pause(0.5);
@@ -114,23 +96,10 @@ const AI = {
       if (pile.slice(-1)[0]?.value === enemy.nextExpected) piles.push(i);
     });
     Events.emit('ai:predict', { piles, value: enemy.nextExpected, confidence: enemy.confidence });
-
-    // Gezielte Stock-Attacke bei hoher Konfidenz
-    if (enemy.confidence > 0.6 && enemy.nextExpected) {
-      try {
-        this.say('aiBlockPlan', enemy.nextExpected);
-        await this.stockAttack(enemy.nextExpected);
-        if (this.over()) return;
-        await Clock.pause(0.3);
-      } catch (e) {
-        console.error('AI.stockAttack Fehler:', e);
-      }
-    }
   },
 
   /** Sofort-Nachziehen-Regel: Hand leer → 5 neue Karten, weiterspielen. */
   async redrawIfHandEmpty() {
-    if (!KI_PLANNER.REDRAW_ON_EMPTY_HAND) return false;
     if (this.over()) return false;
     if (State.player('ai').hand.length > 0) return false;
     if (State.game.drawPile.length === 0) return false;
@@ -147,25 +116,31 @@ const AI = {
   // ----------------------------------------------------------------
 
   /**
-   * executeMoves(depth) – alle möglichen Bauzüge ausführen.
-   * @returns {boolean} true = Zug wurde rekursiv neu gestartet (kein finish nötig)
+   * Alle möglichen Bauzüge ausführen. Spielt die Stock-Priorität eine
+   * Stockkarte, beginnt die Runde von vorn (neue Stockkarte → neu planen),
+   * OHNE nachzuziehen. Höchstens 16 Runden als Sicherheitsgrenze.
    */
-  async executeMoves(depth) {
-    let noMoreMoves = false;
-    let moveCount   = 0;
-    const ai        = State.player('ai');
+  async executeMoves() {
+    for (let i = 0; i < 16; i++) {
+      const again = await this.moveRound();
+      if (!again || this.over()) return;
+    }
+  },
 
-    // ── Joker im Stock zuerst analysieren ─────────────────────────
+  /** Eine Runde: Stock-Joker → Planer → Kandidatenschleife. @returns true = Runde neu beginnen */
+  async moveRound() {
+    let moveCount = 0;
+    const ai      = State.player('ai');
+
+    // ── Joker oben im Stock zuerst analysieren ────────────────────
     const stockTop = ai.stock.slice(-1)[0];
     if (stockTop && stockTop.type === 'joker') {
-      const d = await AI.Analysis.jokerStockTop(stockTop);
+      const d = AI.Analysis.jokerStockTop(stockTop);
       if (d && d.shouldPlay) {
         this.say('aiJokerStock', d.targetPile + 1, this.reasonText(d.reason));
         await Clock.pause(1.0);
         if (this.over()) return false;
         if (Rules.playToBuild('ai', 'stock', 0, d.targetPile)) {
-          this.note('kiMove', { sourceType: 'stock', cardValue: '★', cardType: 'joker',
-                                buildPileIndex: d.targetPile, score: KONFIG.JOKER_STOCK_COMBO_BONUS });
           moveCount++;
           await Clock.pause(0.5);
           if (this.over()) return false;
@@ -180,32 +155,21 @@ const AI = {
     moveCount += await AI.Planner.runChains();
     if (this.over()) return false;
 
-    // ── Getunte Kandidatenschleife ────────────────────────────────
-    const T = this.taktik();
-    for (let round = 0; round < 4; round++) {
-    do {
-      if (this.over()) return false;
+    // ── Kandidatenschleife: jeden weiteren erlaubten Zug spielen ──
+    while (!this.over()) {
       this.say('aiCompute');
       await Clock.pause(0.5);
 
-      const candidates = AI.Eval.candidates('ai');
-
+      const candidates = AI.Eval.candidates('ai');     // sortiert, bester zuerst
       if (candidates.length === 0) {
-        const stockPlayed = await this.stockFallback();
-        if (!stockPlayed) noMoreMoves = true;
-        else if (T && T.CONTINUE_AFTER_FALLBACK) { moveCount++; if (this.over()) return false; continue; }
-        break;
+        await this.stockFallback();
+        return false;
       }
+      const best = candidates[0];
 
-      candidates.sort((a, b) => b.score - a.score);
-      const best      = candidates[0];
-      const stockCard = ai.stock.length > 0 ? ai.stock[ai.stock.length - 1] : null;
+      if (await this.stockPriority(best)) return true;
 
-      const didStockPriority = await this.stockPriority(best, stockCard, depth);
-      if (didStockPriority) return true;      // Rekursion erledigt finish
-
-      const moved = await this.playBest(best);
-      if (!moved) { noMoreMoves = true; break; }
+      if (!(await this.playBest(best))) return false;
       moveCount++;
 
       // Hand leer? → sofort nachziehen und erneut planen
@@ -220,66 +184,21 @@ const AI = {
       }
 
       await Clock.pause(1.0);
-    } while (!noMoreMoves && !this.over());
-
-    // Taktik: offenen Stapel notfalls mit Joker zudecken, dann ggf. weiterspielen
-    if (this.over() || !T || !(await this.jokerCover(T))) break;
-    moveCount++;
-    noMoreMoves = false;
-    if (await this.redrawIfHandEmpty()) {
-      moveCount += await AI.Planner.runChains();
-      if (this.over()) return false;
-    }
     }
     return false;
   },
 
-  /** Taktik: einen für die Gegner-Stockkarte offenen Stapel mit einem Hand-Joker zudecken. */
-  async jokerCover(T) {
-    if (!T.JOKER_COVER_LIMIT) return false;
-    const th = AI.Analysis.threat();
-    if (!th || th.open.length === 0 || th.oppStock > T.JOKER_COVER_LIMIT) return false;
-    const ai = State.player('ai');
-    const j  = ai.hand.findIndex(c => c.type === 'joker');
-    if (j === -1) return false;
-    const pile = th.open[0];
-    this.say('aiJokerCover', th.value, pile + 1);
-    await Clock.pause(1.0);
-    if (this.over()) return false;
-    if (Rules.playToBuild('ai', 'hand', j, pile)) {
-      this.note('kiMove', { sourceType: 'hand', cardValue: '★', cardType: 'joker', buildPileIndex: pile, score: T.COVER_BONUS });
-      await Clock.pause(0.5);
-      return true;
-    }
-    return false;
-  },
-
-  /** Fallback ohne Kandidaten: Stockkarte direkt auf einen Baustapel. */
+  /** Kein Kandidat mehr: Stockkarte direkt legen, falls sie doch passt (seltener Rest des Planers). */
   async stockFallback() {
     const stockCard = State.player('ai').stock.slice(-1)[0];
-    if (!stockCard) return false;
-    const piles = State.game.buildPiles;
+    if (!stockCard) return;
+    const pile = State.game.buildPiles.findIndex((p, j) => Rules.isValidBuild(stockCard, j));
+    if (pile === -1) return;
 
-    for (let j = 0; j < piles.length; j++) {
-      if (!Rules.isValidBuild(stockCard, j)) continue;
-
-      this.say('aiStockPlay', stockCard.value, j + 1);
-      await Clock.pause(1.2);
-      if (this.over()) return false;
-
-      if (Rules.playToBuild('ai', 'stock', 0, j)) {
-        this.note('kiMove', { sourceType: 'stock', cardValue: stockCard.value, cardType: stockCard.type,
-                              buildPileIndex: j, score: KONFIG.SCORE_24 });
-        return true;
-      }
-      break;
-    }
-
-    // Stockkarte wäre spielbar gewesen → für den Tuner „verpasst" zählen
-    if (piles.some((pile, j) => Rules.isValidBuild(stockCard, j))) {
-      this.note('missedStock', { stockCardValue: stockCard.value });
-    }
-    return false;
+    this.say('aiStockPlay', stockCard.value, pile + 1);
+    await Clock.pause(1.2);
+    if (this.over()) return;
+    Rules.playToBuild('ai', 'stock', 0, pile);
   },
 
   /** Besten Kandidaten spielen. */
@@ -288,21 +207,16 @@ const AI = {
              best.buildPileIndex + 1, best.score);
     await Clock.pause(1.2);
     if (this.over()) return false;
-
-    if (Rules.playToBuild('ai', best.sourceType, best.sourceIndex, best.buildPileIndex)) {
-      this.note('kiMove', { sourceType: best.sourceType, cardValue: best.card.value, cardType: best.card.type,
-                            buildPileIndex: best.buildPileIndex, score: best.score });
-      return true;
-    }
-    return false;
+    return Rules.playToBuild('ai', best.sourceType, best.sourceIndex, best.buildPileIndex) === true;
   },
 
   /**
    * Stockkarte bevorzugen, wenn sie denselben Wert wie der beste Kandidat hat.
-   * Startet den Zug danach rekursiv (awaited!) neu.
-   * @returns {boolean} true = gespielt und rekursiv fortgesetzt
+   * @returns {boolean} true = Stockkarte gespielt → Runde neu beginnen
    */
-  async stockPriority(best, stockCard, depth) {
+  async stockPriority(best) {
+    const stock     = State.player('ai').stock;
+    const stockCard = stock.length > 0 ? stock[stock.length - 1] : null;
     if (!stockCard) return false;
     if (best.sourceType === 'stock') return false;
     if (stockCard.type === 'joker') return false;
@@ -312,12 +226,7 @@ const AI = {
     await Clock.pause(1.2);
     if (this.over()) return false;
 
-    if (Rules.playToBuild('ai', 'stock', 0, best.buildPileIndex)) {
-      this.note('kiMove', { sourceType: 'stock', cardValue: stockCard.value, cardType: stockCard.type,
-                            buildPileIndex: best.buildPileIndex, score: KONFIG.SCORE_32 });
-    }
-
-    if (!this.over()) await this.takeTurn(depth + 1);
+    Rules.playToBuild('ai', 'stock', 0, best.buildPileIndex);
     return true;
   },
 
@@ -325,6 +234,12 @@ const AI = {
   // PHASE 3 – ABSCHLUSS
   // ----------------------------------------------------------------
 
+  /**
+   * Zugende. Hat die KI noch einen Joker in der Hand:
+   *   Schwer        – Joker bleibt in der Hand (nur Ablage+Joker-Kombination wird gespielt)
+   *   Mittel/Leicht – Joker wird gespielt, wenn Folgekarten bereitliegen
+   * Danach in JEDER Stufe genau eine Ablage, dann Nachziehen.
+   */
   async finish() {
     if (this.over()) return;
     const ai = State.player('ai');
@@ -333,78 +248,32 @@ const AI = {
       this.say('aiDiscarding');
       await Clock.pause(1);
 
+      const T        = this.taktik();
       const jokerIdx = ai.hand.findIndex(c => c.type === 'joker');
-      if (jokerIdx !== -1 && KONFIG.JOKER_COMBO_ENABLED) {
-        let d = await AI.Analysis.jokerHand(jokerIdx);
-        // 7.0.3-Versuche: Joker am Zugende nicht mehr einzeln verspielen
-        const TJ = this.taktik();
-        if (TJ && d) {
-          if ((d.action === 'buildDirect' && TJ.JOKER_END_DIRECT === false) ||
-              (d.action === 'buildCombo'  && TJ.JOKER_END_COMBO  === false)) {
-            d = { action: 'discard', targetPile: -1, discardIndex: AI.Analysis.jokerBestDiscard() };
-          }
-          if (d.action === 'discard' && TJ.JOKER_END && TJ.JOKER_END !== 'legacy') {
-            const nJ = ai.hand.filter(c => c.type === 'joker').length;
-            if (TJ.JOKER_END === 'park' || (TJ.JOKER_KEEP_MAX > 0 && nJ > TJ.JOKER_KEEP_MAX)) {
-              // Joker als EINZIGE Ablage auf den Jokerstapel (bleibt griffbereit, Handplatz wird frei)
-              if (Rules.playToDiscard('ai', 'hand', jokerIdx, d.discardIndex)) {
-                this.say('aiJokerSecured', d.discardIndex + 1);
-                await Clock.pause(0.8);
-              } else {
-                await this.discard('ai');
-              }
-            } else {
-              await this.discard('ai');          // 'keep' / 'single': genau eine Ablage
-            }
-            d = { action: 'done' };
-          }
-        }
-        if (d && d.action === 'done') {
-          /* bereits abgelegt */
-        } else if (d) {
-          if (d.action === 'buildCombo') {
-            // Erst die Ablagekarte spielen, dann den Joker
-            this.say('aiJokerCombo', d.discardIndex + 1, d.targetPile + 1);
-            if (Rules.playToBuild('ai', 'discard', d.discardIndex, d.targetPile)) {
-              await Clock.pause(0.8);
-              if (this.over()) return;
-              const jNow = ai.hand.findIndex(c => c.type === 'joker');
-              if (jNow !== -1 && Rules.playToBuild('ai', 'hand', jNow, d.targetPile)) {
-                this.note('kiMove', { sourceType: 'hand', cardValue: '★', cardType: 'joker',
-                                      buildPileIndex: d.targetPile, score: KONFIG.JOKER_STOCK_COMBO_BONUS });
-                this.say('aiJokerDone', d.targetPile + 1);
-                await Clock.pause(0.5);
-                if (this.over()) return;
-              }
-            }
-            await this.discard('ai');
-          } else if (d.action === 'buildDirect') {
-            this.say('aiJokerDirect', d.targetPile + 1);
-            if (Rules.playToBuild('ai', 'hand', jokerIdx, d.targetPile)) {
-              this.note('kiMove', { sourceType: 'hand', cardValue: '★', cardType: 'joker',
-                                    buildPileIndex: d.targetPile, score: KONFIG.JOKER_STOCK_COMBO_BONUS });
-              await Clock.pause(0.5);
-              if (this.over()) return;
-            }
-            await this.discard('ai');
-          } else {
-            // Joker sicher ablegen: erst normale Karte, dann Joker auf den Schutzstapel
-            this.say('aiJokerSafe', d.discardIndex + 1);
-            await this.discard('ai');
+      let d = jokerIdx !== -1 ? AI.Analysis.jokerHand(jokerIdx) : null;
+      if (d && d.action === 'buildDirect' && T && T.JOKER_KEEP) d = null;
+
+      if (d && d.action === 'buildCombo') {
+        // Erst die Ablagekarte spielen, dann den Joker
+        this.say('aiJokerCombo', d.discardIndex + 1, d.targetPile + 1);
+        if (Rules.playToBuild('ai', 'discard', d.discardIndex, d.targetPile)) {
+          await Clock.pause(0.8);
+          if (this.over()) return;
+          const jNow = ai.hand.findIndex(c => c.type === 'joker');
+          if (jNow !== -1 && Rules.playToBuild('ai', 'hand', jNow, d.targetPile)) {
+            this.say('aiJokerDone', d.targetPile + 1);
+            await Clock.pause(0.5);
             if (this.over()) return;
-            const jNow = ai.hand.findIndex(c => c.type === 'joker');
-            if (jNow !== -1 && Rules.playToDiscard('ai', 'hand', jNow, d.discardIndex)) {
-              this.say('aiJokerSecured', d.discardIndex + 1);
-              await Clock.pause(0.8);
-              if (this.over()) return;
-            }
           }
-        } else {
-          await this.discard('ai');
         }
-      } else {
-        await this.discard('ai');
+      } else if (d && d.action === 'buildDirect') {
+        this.say('aiJokerDirect', d.targetPile + 1);
+        if (Rules.playToBuild('ai', 'hand', jokerIdx, d.targetPile)) {
+          await Clock.pause(0.5);
+          if (this.over()) return;
+        }
       }
+      await this.discard();
     } else {
       this.say('aiNoHand');
     }
@@ -425,49 +294,16 @@ const AI = {
   },
 
   // ----------------------------------------------------------------
-  // STOCK-ATTACKE & ABLEGEN
+  // ABLEGEN
   // ----------------------------------------------------------------
 
-  /** Gezielter Angriff: Karte legen, die den Gegner beim Stockabbau blockiert. */
-  async stockAttack(targetValue) {
-    if (this.over()) return false;
-    try {
-      const ai = State.player('ai');
-      const validPiles = State.game.buildPiles
-        .map((pile, i) => ({ index: i, current: pile.slice(-1)[0]?.value || 0 }))
-        .filter(p => targetValue === 1 ? p.current === 0 : p.current === targetValue - 1);
-      if (validPiles.length === 0) return false;
-      const bestPile = validPiles.reduce((a, b) => a.current < b.current ? a : b);
-
-      const validCards = [
-        ...ai.hand.map((c, i) => ({ card: c, type: 'hand', index: i })),
-        { card: ai.stock.slice(-1)[0], type: 'stock', index: 0 }
-      ].filter(({ card }) => card && (card.value === targetValue || card.type === 'joker'));
-      const T = this.taktik();
-      const usable = (T && !T.ATTACK_JOKER) ? validCards.filter(c => c.card.type !== 'joker') : validCards;
-      if (usable.length === 0) return false;
-      validCards.length = 0; validCards.push(...usable);
-
-      // Nicht-Joker bevorzugen, darunter höheren Wert zuerst
-      validCards.sort((a, b) =>
-        ((a.card.type === 'joker' ? 1 : 0) - (b.card.type === 'joker' ? 1 : 0)) ||
-        ((b.card.value === '★' ? 0 : b.card.value) - (a.card.value === '★' ? 0 : a.card.value))
-      );
-      const bestCard = validCards[0];
-      return Rules.playToBuild('ai', bestCard.type, bestCard.index, bestPile.index) === true;
-    } catch (e) {
-      console.error('AI.stockAttack Fehler:', e);
-      return false;
-    }
-  },
-
   /**
-   * discard(player) – beste Handkarte auf den besten Ablagestapel legen.
-   * Bewertet alle Handkarten × 4 Stapel (Karten-Term + Stapel-Term, SCORE_13…20).
+   * Beste Handkarte auf den besten Ablagestapel legen (genau eine Karte).
+   * Bewertet alle Handkarten × 4 Stapel: Karten-Term (welche Karte) + Stapel-Term (wohin).
    */
-  async discard(player) {
+  async discard() {
     if (this.over()) return;
-    const me = State.player(player);
+    const me = State.player('ai');
     if (me.hand.length === 0) {
       this.say('aiNoHandToDiscard');
       await Clock.pause(1);
@@ -475,102 +311,78 @@ const AI = {
     }
 
     const human = State.player('human');
-    const opponentCritical = [
+    const opponentVisible = [
       human.stock.slice(-1)[0]?.value,
       ...human.discards.map(p => p[p.length - 1]?.value)
     ].filter(v => v !== undefined);
-
     const criticalNumbers = AI.Eval.opponentCritical();
 
-    const stockTop  = me.stock.length > 0 ? me.stock[me.stock.length - 1].value : null;
-    const handCards = me.hand;
-    const discards  = me.discards;
+    const stockTop   = me.stock.length > 0 ? me.stock[me.stock.length - 1].value : null;
+    const handCards  = me.hand;
+    const discards   = me.discards;
+    const comboCache = AI.Analysis.handComboCache('ai');
 
-    const comboCache = AI.Analysis.handComboCache(player);
-
-    // 7.0.3-Versuche: Ablage nach Nützlichkeit
-    const T  = AI.taktik();
-    const DV = (T && (T.DISC_KEEP_USEFUL || T.DISC_COVER_USEFUL || T.DISC_KEEP_PLAYABLE || T.DISC_COVER_PLAYABLE))
-      ? AI.Analysis.discardValues() : null;
-    const keepJoker = !!(T && T.JOKER_END === 'keep') && handCards.some(c => c.type !== 'joker');
-    const thD = (T && (T.DISC_OPENER || T.DISC_KEEP_OPPV)) ? AI.Analysis.threat() : null;
+    const T         = this.taktik();
+    const useful    = (T && T.DISC_KEEP_USEFUL) ? AI.Analysis.usefulForStock() : null;
+    const keepJoker = !!(T && T.JOKER_KEEP) && handCards.some(c => c.type !== 'joker');
 
     let bestDiscardIndex = -1, bestHandIndex = -1, bestScore = -Infinity;
 
     for (let h = 0; h < handCards.length; h++) {
-      const cardToPlay  = handCards[h];
-      const isDangerous = opponentCritical.includes(cardToPlay.value);
+      const card        = handCards[h];
+      const isDangerous = opponentVisible.includes(card.value);
 
       // ── Karten-Term (unabhängig vom Zielstapel) ──
       let cardTerm = 0;
-      if (cardToPlay.type === 'joker') cardTerm -= KONFIG.SCORE_33;
-      if (stockTop && cardToPlay.type !== 'joker') {
-        const dist = Math.abs(cardToPlay.value - stockTop) * KONFIG.SCORE_38;
+      if (card.type === 'joker') cardTerm -= KONFIG.SCORE_33;
+      if (stockTop && card.type !== 'joker') {
+        const dist = Math.abs(card.value - stockTop) * KONFIG.SCORE_38;
         if (!isNaN(dist) && isFinite(dist)) cardTerm -= dist;
       }
-      if (criticalNumbers.includes(cardToPlay.value + 1)) cardTerm -= KONFIG.SCORE_37;
+      if (criticalNumbers.includes(card.value + 1)) cardTerm -= KONFIG.SCORE_37;
       if (comboCache[h] > 0) cardTerm -= KI_PLANNER.DISCARD_KEEP_COMBO_MALUS;
-      if (keepJoker && cardToPlay.type === 'joker') continue;
-      if (T && cardToPlay.type !== 'joker') {
-        const v = parseInt(cardToPlay.value, 10);
-        if (DV) cardTerm -= (T.DISC_KEEP_USEFUL || 0) * DV.useful(v) + (T.DISC_KEEP_PLAYABLE || 0) * DV.playable(v);
-        if (thD) {
-          const gap = thD.value - v;
-          if (T.DISC_OPENER && gap >= 1 && gap <= (T.AVOID_DIST || 1)) cardTerm += T.DISC_OPENER;
-          if (T.DISC_KEEP_OPPV && gap === 0) cardTerm -= T.DISC_KEEP_OPPV;
-        }
-        if (T.DISC_DUP && handCards.filter(c => c.type !== 'joker' && c.value === cardToPlay.value).length >= 2) cardTerm += T.DISC_DUP;
+      if (keepJoker && card.type === 'joker') continue;                 // Schwer: Joker nie ablegen
+      if (T && card.type !== 'joker') {
+        // Schwer: Karte auf dem Weg zur eigenen Stockkarte behalten, doppelte zuerst ablegen
+        if (useful) cardTerm -= T.DISC_KEEP_USEFUL * useful(parseInt(card.value, 10));
+        if (T.DISC_DUP && handCards.filter(c => c.type !== 'joker' && c.value === card.value).length >= 2) cardTerm += T.DISC_DUP;
       }
 
+      // ── Stapel-Term ──
       for (let i = 0; i < discards.length; i++) {
         const pile    = discards[i];
         const topCard = pile.length > 0 ? pile[pile.length - 1] : null;
-        let score     = KONFIG.SCORE_13 + cardTerm;
+        let score     = cardTerm;
 
         if (isDangerous) score -= KONFIG.SCORE_14;
 
         if (!topCard) {
           score += KONFIG.SCORE_16;
-          if (stockTop && cardToPlay.value === stockTop - 1) score += 50;
-        } else if (cardToPlay.value < topCard.value) {
+          if (stockTop && card.value === stockTop - 1) score += 50;
+        } else if (card.value < topCard.value) {
           score += KONFIG.SCORE_17;
-          if (stockTop && cardToPlay.value === stockTop - 1) score += 50;
+          if (stockTop && card.value === stockTop - 1) score += 50;
         }
 
-        if (topCard && cardToPlay.value === topCard.value - 1) score += KONFIG.SCORE_15;
+        if (topCard && card.value === topCard.value - 1) score += KONFIG.SCORE_15;
 
-        if (KONFIG.SCORE_18 > 0 && topCard && cardToPlay.type !== 'joker') {
-          if (cardToPlay.value === topCard.value + 1) score += KONFIG.SCORE_18;
+        if (KONFIG.SCORE_18 > 0 && topCard && card.type !== 'joker') {
+          if (card.value === topCard.value + 1) score += KONFIG.SCORE_18;
         }
 
-        if (stockTop && cardToPlay.value === stockTop + 1) score += 300;
+        if (stockTop && card.value === stockTop + 1) score += 300;
 
         score -= pile.length * KONFIG.SCORE_19;
 
-        const helpsOpponent = pile.some(c => opponentCritical.includes(c.value));
+        const helpsOpponent = pile.some(c => opponentVisible.includes(c.value));
         if (helpsOpponent) {
           const criticalPenalty = human.stock.length <= 5 ? 3000 : 0;
           score -= KONFIG.SCORE_20 + criticalPenalty;
           if (human.stock.length < 5) score -= KONFIG.SCORE_20;
         }
 
-        // 7.0.3: nützliche/bald spielbare Karte nicht verdecken; gleiche Werte stapeln
-        if (T && topCard && topCard.type !== 'joker') {
-          const tv = parseInt(topCard.value, 10);
-          if (DV) score -= (T.DISC_COVER_USEFUL || 0) * DV.useful(tv) + (T.DISC_COVER_PLAYABLE || 0) * DV.playable(tv);
-          if (T.DISC_SAME && cardToPlay.type !== 'joker' && cardToPlay.value === topCard.value) score += T.DISC_SAME;
-        }
-        // 7.0.3: Serienstapel – größere Karte auf kleinere verdeckt die kleinere (bricht die Serie)
-        if (T && T.SERIES_BREAK_PENALTY > 0 && topCard && topCard.type !== 'joker' &&
-            cardToPlay.type !== 'joker' && cardToPlay.value > topCard.value) {
-          score -= T.SERIES_BREAK_PENALTY * Math.min(pile.length, T.SERIES_LEN_CAP);
-        }
-
-        const jokerProtect = AI.Analysis.jokerProtectDiscard(i);
-        if (jokerProtect.protect) {
-          if (T && T.JOKER_STACK && cardToPlay.type === 'joker') { /* Joker auf Joker: bleibt griffbereit, kein Abzug */ }
-          else score -= (T && T.JOKER_HARD) ? 1000000 : jokerProtect.penalty;
-        }
+        // Joker oben auf der Ablage nicht verdecken
+        if (topCard && topCard.type === 'joker') score -= KONFIG.JOKER_PROTECT_DISCARD_PENALTY;
 
         if (score > bestScore) {
           bestScore        = score;
@@ -581,24 +393,16 @@ const AI = {
     }
 
     if (bestHandIndex >= 0 && bestDiscardIndex >= 0) {
-      const cardToPlay  = handCards[bestHandIndex];
-      const isDangerous = opponentCritical.includes(cardToPlay.value);
-      const cardLabel   = cardToPlay.type === 'joker' ? '★' : cardToPlay.value;
+      const card      = handCards[bestHandIndex];
+      const cardLabel = card.type === 'joker' ? '★' : card.value;
 
       this.say('aiPickDiscard', cardLabel);
       await Clock.pause(0.5);
       if (this.over()) return;
 
-      if (Rules.playToDiscard(player, 'hand', bestHandIndex, bestDiscardIndex)) {
+      if (Rules.playToDiscard('ai', 'hand', bestHandIndex, bestDiscardIndex)) {
         this.say('aiDiscard', cardLabel, bestDiscardIndex + 1);
         await Clock.pause(1);
-        this.note('discardStrategy', {
-          cardValue:       cardToPlay.value,
-          wasDangerous:    isDangerous,
-          stockFollowup:   stockTop && cardToPlay.value === stockTop + 1,
-          createdSequence: discards[bestDiscardIndex]?.slice(-1)[0]?.value
-        });
-        if (this.over()) return;
       } else {
         this.say('aiDiscardFailed');
         await Clock.pause(1);

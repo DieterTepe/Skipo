@@ -1,8 +1,8 @@
 // ================================================================
-//  ai-planner.js  –  Skipo 7.0.1   Namensraum: AI.Planner
+//  ai-planner.js  –  Skipo 7.0.4   Namensraum: AI.Planner
 //  ZUGKETTEN-PLANER (Tiefensuche mit Besucht-Speicher)
 // ----------------------------------------------------------------
-//  Braucht: AI, KONFIG, KI_PLANNER, State, Rules, Clock
+//  Braucht: AI, KI_PLANNER, State, Rules, Clock, I18n
 //  Bietet:  AI.Planner.runChains()  (+ Suchbausteine)
 //
 //  Findet GARANTIERTE Zugketten, bevor die Score-Heuristik einzelne
@@ -10,9 +10,13 @@
 //    1. STOCK-KETTE: Bauzüge, die mindestens eine Stockkarte spielen
 //       (maximiert Stockabbau, spart Joker, schneidet nach dem
 //       letzten Stock-Zug ab – der Rest bleibt der Heuristik).
-//    2. HAND-CLEAR-KETTE: alle Handkarten auf Baustapel → sofort
+//    2. HAND-LEEREN-KETTE: alle Handkarten auf Baustapel → sofort
 //       5 neue ziehen (Skip-Bo-Regel).
-//  Konfiguration: KI_PLANNER (ki-planner.js).
+//
+//  KI-Planung (Einstellung): „Superstark" rechnet mit allen Karten
+//  des eigenen Stockstapels, „Normal" nur mit der obersten sichtbaren
+//  (st.fair) – dann endet jede Stock-Kette nach einer Stockkarte und
+//  der Planer sucht mit der neu aufgedeckten Karte weiter.
 //
 //  Suchzustand (leichtgewichtig): Joker = 0, Baustapel = effektiver
 //  Top-Wert 0–12 (12 wird zu 0: voller Stapel gilt als geleert).
@@ -49,8 +53,7 @@ AI.Planner = {
     const moves  = [];
     const needed = st.builds.map(b => b + 1);
 
-    // 1. Stockkarte (7.0.3, KI-Planung „Normal": nur die sichtbare oberste – die Karten
-    //    darunter liegen verdeckt und gehen dann nicht in die Planung ein)
+    // 1. Stockkarte („Normal": nur die sichtbare oberste, die Karten darunter liegen verdeckt)
     if (st.stockLen > 0 && (!st.fair || st.stockLen === st.stockLen0)) {
       const top = st.stockVals[st.stockLen - 1];
       for (let p = 0; p < 4; p++) {
@@ -142,29 +145,17 @@ AI.Planner = {
     let nodes = 0;
     let best  = null;
 
-    // Taktik (7.0.2): Ketten meiden, die einen Stapel für die Gegner-Stockkarte offen lassen
-    const T  = AI.taktik();
-    const th = (T && T.PLANNER_AVOID_OPEN) ? AI.Analysis.threat() : null;
-    const V  = th ? th.value : null;
-    const endsOpen = st => V !== null && st.builds.some(b => b + 1 === V);
-    const preferClear = !!(T && T.PLANNER_PREFER_CLEAR && goal === 'stock');   // 7.0.3
+    // Schwer: bei sonst gleichen Ketten die mit mehr Handkarten (mehr Nachziehen)
+    const T          = AI.taktik();
+    const preferHand = !!(T && T.PREFER_HAND);
+    const handCards  = c => c.moves.reduce((n, m) => n + (m.src === 'hand' ? 1 : 0), 0);
 
     function better(cand) {
       if (!best) return true;
-      if (cand.stockPlays !== best.stockPlays) return cand.stockPlays > best.stockPlays;
-      if (V !== null && cand.open !== best.open) return !cand.open;
-      if (preferClear && !!cand.clears !== !!best.clears) return !!cand.clears;
-      if (cand.jokers     !== best.jokers)     return cand.jokers     < best.jokers;
-      if (T && T.PLANNER_HAND_FIRST) {
-        const h = c => c.moves.reduce((s, m) => s + (m.src === 'hand' && !m.isJoker ? 1 : 0), 0);
-        if (h(cand) !== h(best)) return h(cand) > h(best);
-      }
-      if (cand.moves.length !== best.moves.length) return cand.moves.length < best.moves.length;
-      if (T && T.PREFER_SRC) {
-        const cnt = c => c.moves.reduce((s, m) => s + (m.src === T.PREFER_SRC ? 1 : 0), 0);
-        return cnt(cand) > cnt(best);
-      }
-      return false;
+      if (cand.stockPlays !== best.stockPlays)       return cand.stockPlays > best.stockPlays;
+      if (cand.jokers     !== best.jokers)           return cand.jokers     < best.jokers;
+      if (cand.moves.length !== best.moves.length)   return cand.moves.length < best.moves.length;
+      return preferHand && handCards(cand) > handCards(best);
     }
 
     const self = this;
@@ -179,7 +170,6 @@ AI.Planner = {
 
       for (const mv of self.moves(st)) {
         if (mv.isJoker && jokers >= KI_PLANNER.MAX_JOKERS_PER_CHAIN) continue;
-        if (mv.isJoker && !mv.fromStock && goal === 'clear' && T && T.CLEAR_NO_JOKER) continue;   // 7.0.3
 
         const nJokers = jokers + (mv.isJoker ? 1 : 0);
         const nStock  = stockPlays + (mv.fromStock ? 1 : 0);
@@ -191,19 +181,12 @@ AI.Planner = {
           if (nStock > 0) {
             const cut    = nPath.slice(0, nLastSt);
             const cutJok = cut.reduce((s, m) => s + (m.isJoker ? 1 : 0), 0);
-            const cand   = { moves: cut, stockPlays: nStock, jokers: cutJok, open: endsOpen(next) };
-            if (better(cand)) best = cand;
-            // 7.0.3: Stockkette über die letzte Stockkarte hinaus verlängert, bis die Hand leer ist
-            if (preferClear && next.hand.length === 0 && nPath.length > nLastSt) {
-              const cand2 = { moves: nPath, stockPlays: nStock, jokers: nJokers, open: endsOpen(next), clears: true };
-              if (better(cand2)) best = cand2;
-            }
-          }
-        } else {
-          if (next.hand.length === 0) {
-            const cand = { moves: nPath, stockPlays: nStock, jokers: nJokers, open: endsOpen(next) };
+            const cand   = { moves: cut, stockPlays: nStock, jokers: cutJok };
             if (better(cand)) best = cand;
           }
+        } else if (next.hand.length === 0) {
+          const cand = { moves: nPath, stockPlays: nStock, jokers: nJokers };
+          if (better(cand)) best = cand;
         }
 
         dfs(next, nPath, nJokers, nStock, nLastSt);
@@ -215,14 +198,15 @@ AI.Planner = {
     return best;
   },
 
-  /** Hand-Clear-Kette ohne Stockabbau verwerfen, wenn sie dem Gegner die Tür öffnet. */
+  /**
+   * Hand-leeren-Kette OHNE eigenen Stockabbau verwerfen, wenn der Gegner-Stock schon
+   * klein ist und die Kette ihm einen Baustapel für seine Stockkarte öffnet.
+   */
   riskCheck(chain) {
-    if (!KI_PLANNER.RISK_CHECK) return true;
-    if (chain.stockPlays > 0)   return true;
+    if (chain.stockPlays > 0) return true;
 
     const humanStock = State.player('human').stock;
-    const T = AI.taktik();
-    if (!(T && T.RISK_ALWAYS) && humanStock.length > KI_PLANNER.RISK_OPP_STOCK_LIMIT) return true;
+    if (humanStock.length > KI_PLANNER.RISK_OPP_STOCK_LIMIT) return true;
     const hTopCard = humanStock[humanStock.length - 1];
     if (!hTopCard) return true;
     const hTop = hTopCard.type === 'joker' ? null : hTopCard.value;
@@ -238,7 +222,6 @@ AI.Planner = {
 
   /** Ketten planen und spielen, bis keine mehr existiert. @returns Anzahl Einzelzüge */
   async runChains() {
-    if (!KI_PLANNER.ENABLED) return 0;
     let played = 0;
     let safety = 0;
 
@@ -259,20 +242,18 @@ AI.Planner = {
         continue;
       }
 
-      // Ziel 2: Hand komplett leeren
-      if (KI_PLANNER.HAND_CLEAR_ENABLED) {
-        chain = this.search('clear');
-        if (chain && chain.moves.length > 0 && this.riskCheck(chain)) {
-          AI.say('aiChainClear', chain.moves.length);
-          await Clock.pause(0.8);
-          if (AI.over()) return played;
-          const n = await this.executeChain(chain);
-          played += n;
-          if (AI.over()) return played;
-          if (n === 0) break;
-          await AI.redrawIfHandEmpty();
-          continue;
-        }
+      // Ziel 2: Hand komplett leeren (→ sofort 5 neue Karten)
+      chain = this.search('clear');
+      if (chain && chain.moves.length > 0 && this.riskCheck(chain)) {
+        AI.say('aiChainClear', chain.moves.length);
+        await Clock.pause(0.8);
+        if (AI.over()) return played;
+        const n = await this.executeChain(chain);
+        played += n;
+        if (AI.over()) return played;
+        if (n === 0) break;
+        await AI.redrawIfHandEmpty();
+        continue;
       }
 
       break;
@@ -318,13 +299,6 @@ AI.Planner = {
         console.warn('Planner: Zug abgelehnt', mv);
         return done;
       }
-      AI.note('kiMove', {
-        sourceType:     srcType,
-        cardValue:      card.type === 'joker' ? '★' : card.value,
-        cardType:       card.type,
-        buildPileIndex: mv.pile,
-        score:          mv.fromStock ? KONFIG.SCORE_24 : KONFIG.SCORE_5
-      });
       done++;
       if (AI.over()) return done;
     }

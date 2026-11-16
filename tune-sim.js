@@ -1,34 +1,42 @@
 #!/usr/bin/env node
 // ================================================================
-//  tune-sim.js  –  Skipo   KI-TUNING-PRÜFSTAND (nur Node)
+//  tune-sim.js  –  Skipo   STÄRKE-PRÜFSTAND (nur Node, nicht im Spiel)
 // ----------------------------------------------------------------
-//  KI gegen KI. Zwei Konfigurationen spielen dieselben Kartenver-
+//  KI gegen KI. Zwei Seiten A und B spielen dieselben Kartenver-
 //  teilungen (Seed) je zweimal mit getauschten Sitzen. So heben sich
 //  Kartenglück und Anfangsvorteil auf; übrig bleibt die Stärke.
 //
-//  Aufruf:
-//    node tune-sim.js --games=500 --seed=1                      Kontrolle: A gegen A (~50 %)
-//    node tune-sim.js --games=500 --set SCORE_1=0 SCORE_5=200   Herausforderer B = A + Änderungen
-//    node tune-sim.js --games=300 --sweep [--from=N] [--only=KEY,KEY]   jeden KONFIG-Wert ×0, ×0.5, ×2
-//    node tune-sim.js --games=500 --taktik KEY=WERT ...         KI_TAKTIK-Werte für B (A: KI_TAKTIK aus)
-//    node tune-sim.js --games=500 --a=konfigA.json --b=konfigB.json
-//    node tune-sim.js --games=500 --bot                         Herausforderer gegen einfachen Bot
-//    Zusatz --basis: A = aktuelle KI_TAKTIK-Standardwerte (statt Taktik aus) → B misst nur den neuen Schalter
+//  Jede Seite = Stufe/Planung (wie in den Einstellungen) + Änderungen.
+//  Standard für beide: hard/super. Änderungen gelten für B; mit dem
+//  Vorsatz „A:" für A.
+//      S:KEY=WERT   Wert der Stufe          (KI_STUFEN[stufe].KEY)
+//      P:KEY=WERT   Wert des Planers        (KI_PLANNER.KEY)
+//      K:KEY=WERT   Wert der Zugbewertung   (KONFIG.KEY)
 //
-//  Ausgabe: Siegrate von B mit 95-%-Intervall, Stockdifferenz,
-//  Züge, Dauer. Sweep-Ergebnisse werden fortlaufend in
-//  tune-results.jsonl geschrieben (Abbruch/Fortsetzung möglich).
+//  Aufruf:
+//    node tune-sim.js --games=500                       Kontrolle A = B → exakt 50 %
+//    node tune-sim.js --games=2000 S:AVOID_DIST=4       Schwer mit Abstand 4 gegen Schwer
+//    node tune-sim.js --games=2000 --a=medium/super     Schwer gegen Mittel
+//    node tune-sim.js --games=2000 --b=hard/normal      Planung Normal gegen Superstark
+//    node tune-sim.js --games=2000 K:SCORE_15=200 A:P:MAX_NODES=20000
+//    node tune-sim.js --games=1000 --bot                B gegen den einfachen Bot
+//    node tune-sim.js --games=300 --sweep [--from=N] [--only=KEY,KEY]
+//                                                       jeden KONFIG-Wert ×0 / ×0.5 / ×2
+//    Zusätze: --seed=N  --label=TEXT  --save (Ergebnis an tune-results.jsonl anhängen)
+//
+//  Ausgabe: Siegrate von B mit 95-%-Bereich, Stockdifferenz, Züge.
+//  ▲ = B klar stärker, ▼ = B klar schwächer, · = kein klarer Unterschied.
+//  Übernahmeregel: ≥ 2000 Paare, > 53 %, mit zweitem Seed bestätigt.
 //
 //  Trick: Die KI spielt im Code immer als 'ai' gegen 'human'. Für den
 //  Sitz „human" werden vor dem Zug die Spielerobjekte und die Ablage-
-//  Historie getauscht, KONFIG/KI_TAKTIK auf den Satz des Sitzes
-//  gesetzt, dann AI.takeTurn(), danach zurückgetauscht. Kein Spiel-
-//  code wird dafür verändert.
+//  Historie getauscht, die Einstellungen der Seite gesetzt, dann
+//  AI.takeTurn(), danach zurückgetauscht. Kein Spielcode wird verändert.
 // ================================================================
 
 const fs   = require('fs');
 const path = require('path');
-const vm   = require('vm');
+const { makeEngine } = require('./test-sim.js');
 
 const DIR  = __dirname;
 const args = process.argv.slice(2);
@@ -37,33 +45,12 @@ const GAMES = parseInt(opt('games', '200'), 10);
 const SEED  = parseInt(opt('seed', '1'), 10);
 const OUT   = opt('out', path.join(DIR, 'tune-results.jsonl'));
 
-const FILES = ['konfig.js', 'ki-planner.js', 'core-events.js', 'core-store.js', 'core-settings.js',
-               'core-i18n.js', 'core-state.js', 'core-rules.js', 'ai-turn.js', 'ai-planner.js',
-               'ai-eval.js', 'ai-analysis.js', 'core-flow.js', 'tracking.js'];
-if (fs.existsSync(path.join(DIR, 'ki-taktik.js'))) FILES.splice(2, 0, 'ki-taktik.js');
-
-function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// ── Engine laden ──
-function makeEngine() {
-  const sandbox = { console: { log() {}, warn() {}, error() {}, info() {} }, setTimeout, clearTimeout, Date, JSON, Math };
-  const ctx = vm.createContext(sandbox);
-  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(DIR, f), 'utf8'), ctx, { filename: f });
-  vm.runInContext(`
-    Settings.load(); I18n.init();
-    Clock.pause = () => Promise.resolve();
-    globalThis.__baseKonfig = JSON.parse(JSON.stringify(KONFIG));
-    globalThis.__baseTaktik = (typeof KI_TAKTIK !== 'undefined') ? JSON.parse(JSON.stringify(KI_TAKTIK)) : null;
-    globalThis.__basePlanner = JSON.parse(JSON.stringify(KI_PLANNER));
+// ── Engine laden (dieselben Skripte wie das Spiel) und Messrahmen einhängen ──
+function makeTuner() {
+  const eng = makeEngine(DIR);
+  eng.run(`
+    globalThis.__base = { konfig: { ...KONFIG }, planner: { ...KI_PLANNER },
+                          stufen: JSON.parse(JSON.stringify(KI_STUFEN)) };
     globalThis.__moves = 0;
     Events.on('move:build', () => __moves++);
     function swap() {
@@ -71,12 +58,16 @@ function makeEngine() {
       [g.players.human, g.players.ai] = [g.players.ai, g.players.human];
       [g.history.human, g.history.ai] = [g.history.ai, g.history.human];
     }
-    function useCfg(cfg) {
-      KONFIG = cfg.konfig;
-      if (typeof KI_TAKTIK !== 'undefined' && cfg.taktik) KI_TAKTIK = cfg.taktik;
-      Object.assign(KI_PLANNER, cfg.planner || __basePlanner);
+    /** Einstellungen einer Seite setzen: erst alles auf Ausgangswerte, dann ihre Änderungen. */
+    function useSide(side) {
+      Object.assign(KONFIG, __base.konfig, side.konfig);
+      Object.assign(KI_PLANNER, __base.planner, side.planner);
+      for (const l of Object.keys(__base.stufen)) KI_STUFEN[l] = __base.stufen[l] && { ...__base.stufen[l] };
+      if (KI_STUFEN[side.level]) Object.assign(KI_STUFEN[side.level], side.stufe);
+      Settings.level    = side.level;
+      Settings.planning = side.planning;
     }
-    // Einfacher Bot (wie test-sim.js) für den Sitz 'human'
+    // Einfacher Bot (wie der Mensch-Bot in test-sim.js) für den Sitz 'human'
     function botTurn() {
       const me = State.game.players.human;
       for (let guard = 0; guard < 80; guard++) {
@@ -96,11 +87,12 @@ function makeEngine() {
       Rules.playToDiscard('human', 'hand', best, pile);
     }
     /**
-     * Ein Spiel: Sitz 'human' spielt cfgH (oder Bot), Sitz 'ai' spielt cfgA. 'human' beginnt.
+     * Ein Spiel: Sitz 'human' spielt sideH (oder Bot), Sitz 'ai' spielt sideA. 'human' beginnt.
      * @returns { winner: 'human'|'ai'|'draw', margin: Stockdifferenz aus Sicht von 'ai', turns }
      */
-    globalThis.__play = async function (seed, cfgH, cfgA, botH, botA) {
+    globalThis.__play = async function (seed, sideH, sideA, botH, botA) {
       Rules.random = (function (s) { let a = s >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })(seed);
+      __log.length = 0;                       // Zugprotokoll des Regel-Prüfstands nicht anwachsen lassen
       Rules.newGame();
       let turns = 0, stale = 0;
       while (!Rules.winner() && turns < 300) {
@@ -108,12 +100,12 @@ function makeEngine() {
         const before = __moves;
         // Sitz human (beginnt)
         if (botH) { botTurn(); }
-        else { swap(); useCfg(cfgH); await AI.takeTurn(0); swap(); }
+        else { swap(); useSide(sideH); await AI.takeTurn(); swap(); }
         if (Rules.winner()) break;
         Rules.drawToFive('human');
         // Sitz ai
         if (botA) { swap(); botTurn(); swap(); Rules.drawToFive('ai'); }
-        else { useCfg(cfgA); await AI.takeTurn(0); }
+        else { useSide(sideA); await AI.takeTurn(); }
         // festgefahren: keiner baut, beide Hände leer, Nachziehstapel leer
         const g = State.game;
         if (__moves === before && g.players.human.hand.length === 0 && g.players.ai.hand.length === 0 && g.drawPile.length === 0) { if (++stale >= 2) break; } else stale = 0;
@@ -122,44 +114,51 @@ function makeEngine() {
       const h = State.game.players.human.stock.length, a = State.game.players.ai.stock.length;
       return { winner: w ? w.winner : (h === a ? 'draw' : (a < h ? 'ai' : 'human')), margin: h - a, turns };
     };
-  `, ctx, { filename: 'harness-tune' });
-  return ctx;
+  `);
+  return { play: eng.run('__play'), base: JSON.parse(eng.run('JSON.stringify(__base)')), page: eng.page };
 }
 
-// ── Konfigurationen bauen ──
-function loadJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
-function parseSets(list) {
-  const o = {};
-  for (const s of list) {
-    const m = s.match(/^([A-Za-z_0-9]+)=(.+)$/);
-    if (!m) continue;
-    const v = m[2];
-    o[m[1]] = v === 'true' ? true : v === 'false' ? false : isNaN(Number(v)) ? v : Number(v);
-  }
-  return o;
+// ── Seiten aus den Argumenten bauen ──
+function parseValue(v) {
+  return v === 'true' ? true : v === 'false' ? false : v === 'null' ? null : isNaN(Number(v)) ? v : Number(v);
 }
+function makeSide(spec, sets, base) {
+  const [level, planning] = String(spec).split('/');
+  if (!(level in base.stufen)) throw new Error('Unbekannte Stufe: ' + level + ' (easy | medium | hard)');
+  if (!['super', 'normal'].includes(planning)) throw new Error('Unbekannte Planung: ' + planning + ' (super | normal)');
+  const side = { level, planning, stufe: {}, planner: {}, konfig: {} };
+  for (const s of sets) {
+    const m = s.match(/^([SPK]):([A-Za-z_0-9]+)=(.+)$/);
+    const target = { S: 'stufe', P: 'planner', K: 'konfig' }[m[1]];
+    const known  = { S: base.stufen[level] || {}, P: base.planner, K: base.konfig }[m[1]];
+    if (!(m[2] in known)) throw new Error(`Unbekannter Schlüssel ${m[1]}:${m[2]}` + (m[1] === 'S' && !base.stufen[level] ? ` (Stufe ${level} hat keine Werte)` : ''));
+    side[target][m[2]] = parseValue(m[3]);
+  }
+  return side;
+}
+const describe = s => `${s.level}/${s.planning}` + [['S', s.stufe], ['P', s.planner], ['K', s.konfig]]
+  .flatMap(([p, o]) => Object.entries(o).map(([k, v]) => ` ${p}:${k}=${v}`)).join('');
 
 /** Match: GAMES Paare (Seed, Sitze getauscht). @returns Statistik aus Sicht von B */
-async function match(ctx, cfgA, cfgB, games, seed, useBot, label) {
+async function match(play, sideA, sideB, games, seed, useBot, label) {
   const t0 = Date.now();
   let bWins = 0, draws = 0, margin = 0, turns = 0, played = 0;
   for (let g = 0; g < games; g++) {
     const s = seed * 1000003 + g;
     // Spiel 1: B auf Sitz 'human' (beginnt), A auf 'ai'
-    const r1 = await ctx.__play(s, cfgB, cfgA, false, useBot);
+    const r1 = await play(s, sideB, sideA, false, useBot);
     if (r1.winner === 'human') bWins++; else if (r1.winner === 'draw') draws++;
     margin += r1.margin; turns += r1.turns; played++;
     // Spiel 2: A auf 'human' (oder Bot), B auf 'ai'
-    const r2 = await ctx.__play(s, cfgA, cfgB, useBot, false);
+    const r2 = await play(s, sideA, sideB, useBot, false);
     if (r2.winner === 'ai') bWins++; else if (r2.winner === 'draw') draws++;
     margin -= r2.margin; turns += r2.turns; played++;
   }
-  const p   = bWins / played;
-  const ci  = 1.96 * Math.sqrt(p * (1 - p) / played);
-  const res = { label, games: played, winB: +(p * 100).toFixed(1), ci: +(ci * 100).toFixed(1),
-                draws, marginB: +(-margin / played).toFixed(2), turns: +(turns / played).toFixed(1),
-                sec: +((Date.now() - t0) / 1000).toFixed(1) };
-  return res;
+  const p  = bWins / played;
+  const ci = 1.96 * Math.sqrt(p * (1 - p) / played);
+  return { label, games: played, winB: +(p * 100).toFixed(1), ci: +(ci * 100).toFixed(1),
+           draws, marginB: +(-margin / played).toFixed(2), turns: +(turns / played).toFixed(1),
+           sec: +((Date.now() - t0) / 1000).toFixed(1) };
 }
 
 function fmt(r) {
@@ -168,32 +167,28 @@ function fmt(r) {
 }
 
 (async function main() {
-  const ctx  = makeEngine();
-  const base = ctx.__baseKonfig;
-  const baseT = ctx.__baseTaktik;
-  // --basis: A = aktuelle KI_TAKTIK-Standardwerte (z. B. 7.0.2 mit Blockade), sonst A = Taktik aus (7.0.1)
-  const aTaktik = baseT ? (args.includes('--basis') ? { ...baseT } : { ...baseT, ENABLED: false }) : null;
-  const cfgA = opt('a') ? { konfig: loadJson(opt('a')).konfig || loadJson(opt('a')), taktik: baseT && loadJson(opt('a')).taktik || aTaktik }
-                        : { konfig: base, taktik: aTaktik };
+  const { play, base, page } = makeTuner();
   const useBot = args.includes('--bot');
+  const sets   = args.filter(a => /^(A:)?[SPK]:[A-Za-z_0-9]+=/.test(a));
+  const sideA  = makeSide(opt('a', 'hard/super'), sets.filter(a => a.startsWith('A:')).map(a => a.slice(2)), base);
+  const sideB  = makeSide(opt('b', 'hard/super'), sets.filter(a => !a.startsWith('A:')), base);
 
   if (args.includes('--sweep')) {
     const from = parseInt(opt('from', '0'), 10);
     const only = opt('only') ? opt('only').split(',') : null;
-    const keys = Object.keys(base).filter(k => only ? only.includes(k) : true);
+    const keys = Object.keys(base.konfig).filter(k => only ? only.includes(k) : true);
     const done = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l).label) : [];
-    console.log(`Sweep: ${keys.length} Schlüssel, ${GAMES} Paare je Variante, Seed ${SEED}`);
+    console.log(`Sweep (${page}): ${keys.length} Schlüssel, ${GAMES} Paare je Variante, Seed ${SEED}, Seiten ${describe(sideA)}`);
     for (let i = from; i < keys.length; i++) {
-      const k = keys[i];
-      const v = base[k];
+      const k = keys[i], v = base.konfig[k];
       const variants = typeof v === 'boolean' ? [[!v, String(!v)]]
                      : typeof v === 'number' ? (v === 0 ? [[1, '=1'], [10, '=10'], [100, '=100']] : [[0, '×0'], [v * 0.5, '×0.5'], [v * 2, '×2']])
                      : [];
       for (const [nv, tag] of variants) {
         const label = `${k} ${tag}`;
         if (done.includes(label)) continue;
-        const cfgB = { konfig: { ...base, [k]: nv }, taktik: cfgA.taktik };
-        const r = await match(ctx, cfgA, cfgB, GAMES, SEED, useBot, label);
+        const b = { ...sideA, konfig: { ...sideA.konfig, [k]: nv } };
+        const r = await match(play, sideA, b, GAMES, SEED, useBot, label);
         r.key = k; r.value = nv; r.base = v;
         console.log(`[${i + 1}/${keys.length}] ` + fmt(r));
         fs.appendFileSync(OUT, JSON.stringify(r) + '\n');
@@ -202,24 +197,11 @@ function fmt(r) {
     return;
   }
 
-  let cfgB;
-  if (opt('b')) { const j = loadJson(opt('b')); cfgB = { konfig: j.konfig || j, taktik: j.taktik || cfgA.taktik, planner: j.planner || null }; }
-  else {
-    // Präfixe: K:KEY=V (KONFIG), T:KEY=V (KI_TAKTIK, schaltet ENABLED ein), P:KEY=V (KI_PLANNER)
-    // ohne Präfix: KONFIG; mit --taktik: alle als KI_TAKTIK
-    const raw = args.filter(a => /^([KTP]:)?[A-Za-z_0-9]+=/.test(a));
-    const k = parseSets(raw.filter(a => a.startsWith('K:')).map(a => a.slice(2)));
-    const t = parseSets(raw.filter(a => a.startsWith('T:')).map(a => a.slice(2)));
-    const pl = parseSets(raw.filter(a => a.startsWith('P:')).map(a => a.slice(2)));
-    const plain = parseSets(raw.filter(a => !/^[KTP]:/.test(a)));
-    if (args.includes('--taktik')) Object.assign(t, plain); else Object.assign(k, plain);
-    cfgB = { konfig: { ...base, ...k },
-             taktik: Object.keys(t).length ? { ...baseT, ENABLED: true, ...t } : cfgA.taktik,
-             planner: Object.keys(pl).length ? { ...ctx.__basePlanner, ...pl } : null };
-  }
-  const label = opt('label', useBot ? 'B gegen Bot' : (JSON.stringify(cfgB) === JSON.stringify(cfgA) ? 'Kontrolle A gegen A' : 'B gegen A'));
-  console.log(`${label}: ${GAMES} Paare, Seed ${SEED}`);
-  const r = await match(ctx, cfgA, cfgB, GAMES, SEED, useBot, label);
+  const same  = JSON.stringify(sideA) === JSON.stringify(sideB);
+  const label = opt('label', useBot ? 'B gegen Bot' : (same ? 'Kontrolle A = B' : 'B gegen A'));
+  console.log(`${page} – ${GAMES} Paare, Seed ${SEED}`);
+  console.log(`  A: ${useBot ? 'einfacher Bot' : describe(sideA)}\n  B: ${describe(sideB)}`);
+  const r = await match(play, sideA, sideB, GAMES, SEED, useBot, label);
   console.log(fmt(r));
   if (args.includes('--save')) fs.appendFileSync(OUT, JSON.stringify(r) + '\n');
-})().catch(e => { console.error('Abbruch:', e); process.exit(2); });
+})().catch(e => { console.error('Abbruch:', e.message || e); process.exit(2); });

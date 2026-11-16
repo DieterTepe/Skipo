@@ -1,5 +1,5 @@
 // ================================================================
-//  core-flow.js  –  Skipo 7.0.1   Namensraum: Flow
+//  core-flow.js  –  Skipo 7.0.4   Namensraum: Flow
 //  SPIELSCHLEIFE: Start, Spielerwechsel, Spielende
 // ----------------------------------------------------------------
 //  Braucht: State, Rules, Events, I18n, Clock, AI     Bietet: Flow.*
@@ -94,7 +94,7 @@ const Flow = {
     await Clock.pause(1.2);
     if (State.turn.over) return;
 
-    await AI.takeTurn(0);
+    await AI.takeTurn();
     if (this.checkEnd()) return;
 
     State.turn.player = 'human';

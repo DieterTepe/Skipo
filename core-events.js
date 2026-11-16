@@ -1,5 +1,5 @@
 // ================================================================
-//  core-events.js  –  Skipo 7.0.1   Namensraum: Events
+//  core-events.js  –  Skipo 7.0.4   Namensraum: Events
 //  MINI-EREIGNISBUS
 // ----------------------------------------------------------------
 //  Braucht: nichts        Bietet: Events.on / off / emit
@@ -21,7 +21,6 @@
 //    pile:cleared     {pile, count}              Rules
 //    msg              {key, args}                alle (über I18n.say)
 //    ai:predict       {piles, value, confidence} | null      AI
-//    ai:note          {type, ...}                AI (für Tracking)
 //    settings:change  {key, value}               Settings
 //    lang:change      lang                       I18n
 //    render           –                          Render (nach Vollrender)

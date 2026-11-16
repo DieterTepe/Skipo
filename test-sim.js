@@ -1,47 +1,45 @@
 #!/usr/bin/env node
 // ================================================================
-//  test-sim.js  –  Skipo 7.0.1   PRÜFSTAND (nur Node, nicht im Spiel)
+//  test-sim.js  –  Skipo   REGEL-PRÜFSTAND (nur Node, nicht im Spiel)
 // ----------------------------------------------------------------
-//  Aufruf:   node test-sim.js [Spiele] [Seed] [--old=ORDNER] [--new-only] [--taktik]
-//            --taktik: Blockade-Taktik (ki-taktik.js) eingeschaltet lassen – dann ist
-//            keine Äquivalenz zu 7.0.0 zu erwarten (nur mit --new-only sinnvoll).
-//  Beispiel: node test-sim.js 300 42
+//  Aufruf:   node test-sim.js [Spiele] [Seed] [--ref=ORDNER]
+//                             [--stufe=easy|medium|hard] [--planung=super|normal]
+//  Beispiel: node test-sim.js 300 7 --ref=../skipo-ref
 //
 //  Was passiert:
-//    1. Die neuen Dateien (core-*, ai-*, core-flow, tracking) werden
-//       in einer Node-Sandbox OHNE document/window/localStorage
-//       geladen. Jeder DOM-Zugriff = sofortiger Fehler.
-//    2. Ein deterministischer „Mensch-Bot" spielt gegen die KI.
-//       Der Zufall (nur Mischen) kommt aus einem Seed-Generator.
-//    3. Invarianten je Zug: 156 Karten, Baustapel aufsteigend, KI legt höchstens 1× ab,
-//       Hand ≤ 5, Stock nur von oben.
-//    4. Äquivalenz: Dieselben Spiele laufen mit demselben Seed durch
-//       die 7.0.0-Engine (state/engine/ai/view/endgame.js mit
-//       DOM-Attrappe). Die Zugfolgen werden Zug für Zug verglichen.
-//       Bekannte 7.0.0-Eigenheit: nach dem Siegzug der KI spielte
-//       7.0.0 noch Karten weiter (Siegprüfung kam erst später).
-//       Deshalb wird jede Zugfolge nach dem Zug abgeschnitten, mit
-//       dem ein Stock leer wurde.
+//    1. Die Spieldateien werden in einer Node-Sandbox OHNE document /
+//       window / localStorage geladen – und zwar genau die Skripte in
+//       genau der Reihenfolge, die in der aktuellen SkipBo_*.html steht
+//       (ohne ui-*.js und app.js). Jeder DOM-Zugriff in core/ai/flow/
+//       tracking ist damit ein sofortiger Fehler.
+//    2. Ein deterministischer „Mensch-Bot" spielt gegen die KI. Der
+//       Zufall (nur das Mischen) kommt aus einem Seed-Generator.
+//    3. Für jede Kombination aus Schwierigkeit (Leicht/Mittel/Schwer)
+//       und KI-Planung (Superstark/Normal) – ohne Angabe alle sechs:
+//       Invarianten je Zug: 156 Karten, Baustapel aufsteigend, Hand ≤ 5,
+//       KI legt höchstens EINE Karte je Zug ab, Spiel endet.
+//    4. Mit --ref=ORDNER: Dieselben Spiele laufen zusätzlich mit dem
+//       Stand in ORDNER (eine ältere Version als Maßstab). Die Zugfolgen
+//       werden Zug für Zug verglichen. So wird bewiesen, dass ein Umbau
+//       das Spiel nicht verändert hat.
+//       Maßstab erzeugen:  git worktree add ../skipo-ref stand-7.0.4
 //
-//  Ergebnis: Zusammenfassung + Exit-Code 0 (alles gleich) / 1 (Abweichung)
+//  Rückgabewert 0 = alles in Ordnung, 1 = Fehler (für Skripte).
 // ================================================================
 
 const fs   = require('fs');
 const path = require('path');
 const vm   = require('vm');
 
-const args    = process.argv.slice(2);
-const GAMES   = parseInt(args.find(a => /^\d+$/.test(a)) || '100', 10);
-const SEED    = parseInt(args.filter(a => /^\d+$/.test(a))[1] || '1', 10);
-const NEWONLY = args.includes('--new-only');
-const OLDDIR  = (args.find(a => a.startsWith('--old=')) || '').slice(6) || __dirname;
-const DIR     = __dirname;
-
-const TAKTIK  = args.includes('--taktik');       // Blockade-Taktik (7.0.2) eingeschaltet lassen
-const NEW_FILES = ['konfig.js', 'ki-planner.js', 'ki-taktik.js', 'core-events.js', 'core-store.js', 'core-settings.js',
-                   'core-i18n.js', 'core-state.js', 'core-rules.js', 'ai-turn.js', 'ai-planner.js',
-                   'ai-eval.js', 'ai-analysis.js', 'core-flow.js', 'tracking.js'];
-const OLD_FILES = ['konfig.js', 'ki-planner.js', 'state.js', 'engine.js', 'view.js', 'ai.js', 'endgame.js'];
+const args  = process.argv.slice(2);
+const nums  = args.filter(a => /^\d+$/.test(a));
+const opt   = name => (args.find(a => a.startsWith('--' + name + '=')) || '').slice(name.length + 3);
+const GAMES = parseInt(nums[0] || '100', 10);
+const SEED  = parseInt(nums[1] || '1', 10);
+const DIR   = __dirname;
+const REF   = opt('ref') ? path.resolve(opt('ref')) : null;
+const LEVELS    = opt('stufe')   ? [opt('stufe')]   : ['easy', 'medium', 'hard'];
+const PLANNINGS = opt('planung') ? [opt('planung')] : ['super', 'normal'];
 
 // ── Seed-Zufall (mulberry32) ──
 function mulberry32(seed) {
@@ -61,33 +59,31 @@ async function waitFor(fn, maxTicks = 200000) {
   return false;
 }
 
-const quietConsole = () => {
-  const warnings = [];
-  return {
-    obj: { log() {}, warn: (...a) => warnings.push(a.join(' ')), error: (...a) => warnings.push('ERR ' + a.join(' ')), info() {} },
-    warnings
-  };
-};
-
-function loadInto(ctx, dir, files) {
-  for (const f of files) {
-    const code = fs.readFileSync(path.join(dir, f), 'utf8');
-    vm.runInContext(code, ctx, { filename: f });
-  }
+/** Skriptliste aus der aktuellen Startseite lesen (höchste Version, keine Weiterleitung). */
+function scriptList(dir) {
+  const pages = fs.readdirSync(dir).filter(f => /^SkipBo_\d+_\d+_\d+\.html$/.test(f))
+    .map(f => ({ f, v: f.match(/\d+/g).map(Number), html: fs.readFileSync(path.join(dir, f), 'utf8') }))
+    .filter(p => !/http-equiv="refresh"/.test(p.html) && /<script\s+src=/.test(p.html))
+    .sort((a, b) => (b.v[0] - a.v[0]) || (b.v[1] - a.v[1]) || (b.v[2] - a.v[2]));
+  if (!pages.length) throw new Error('Keine Startseite SkipBo_x_y_z.html mit Skripten in ' + dir);
+  const files = [...pages[0].html.matchAll(/<script\s+src="[^"]*\/([A-Za-z0-9_.-]+\.js)(?:\?[^"]*)?"/g)].map(m => m[1])
+    .filter(f => !/^ui-/.test(f) && f !== 'app.js');
+  return { page: pages[0].f, files };
 }
 
-// ================================================================
-// NEUE ENGINE (7.0.1) – Sandbox ohne DOM
-// ================================================================
-function makeNew() {
-  const qc = quietConsole();
-  const sandbox = { console: qc.obj, setTimeout, clearTimeout, setImmediate, Date, JSON, Math };
+/** Spiel-Engine aus einem Ordner laden (Sandbox ohne DOM). */
+function makeEngine(dir) {
+  const warnings = [];
+  const sandbox = {
+    console: { log() {}, info() {}, warn: (...a) => warnings.push(a.join(' ')), error: (...a) => warnings.push('ERR ' + a.join(' ')) },
+    setTimeout, clearTimeout, setImmediate, Date, JSON, Math
+  };
   const ctx = vm.createContext(sandbox);
-  loadInto(ctx, DIR, NEW_FILES.filter(f => f !== 'ki-taktik.js' || fs.existsSync(path.join(DIR, f))));
+  const { page, files } = scriptList(dir);
+  for (const f of files) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
   vm.runInContext(`
     Settings.load(); I18n.init(); Tracking.init();
     Clock.pause = () => Promise.resolve();
-    if (typeof KI_TAKTIK !== 'undefined') KI_TAKTIK.ENABLED = ${TAKTIK};
     globalThis.__log = [];
     globalThis.__humanReady = false;
     Events.on('move:build',   d => __log.push(d.player + ':' + d.source + ':' + (d.card.type === 'joker' ? 'J' : d.card.value) + '>B' + d.pile));
@@ -95,6 +91,7 @@ function makeNew() {
     Events.on('pile:cleared', d => __log.push('CLEAR' + d.pile));
     Events.on('turn:change',  d => { if (d.player === 'human') __humanReady = true; });
     globalThis.__api = {
+      setup(level, planning) { Settings.level = level; Settings.planning = planning; },
       start(rng)      { Rules.random = rng; return Flow.startGame(); },
       over()          { return State.turn.over; },
       result()        { return State.turn.result; },
@@ -128,102 +125,13 @@ function makeNew() {
         return null;
       }
     };
-  `, ctx, { filename: 'harness-new' });
-  return { ctx, api: ctx.__api, log: () => ctx.__log, warnings: qc.warnings,
+  `, ctx, { filename: 'pruefstand' });
+  return { dir, page, files, api: ctx.__api, log: () => ctx.__log, warnings, run: code => vm.runInContext(code, ctx),
            ready: () => ctx.__humanReady, resetReady: () => { ctx.__humanReady = false; } };
 }
 
 // ================================================================
-// ALTE ENGINE (7.0.0) – Sandbox mit DOM-Attrappe
-// ================================================================
-function makeOld() {
-  const qc = quietConsole();
-  const fakeEl = () => ({
-    style: { setProperty() {} }, innerHTML: '', textContent: '', className: '', dataset: {}, offsetHeight: 0, children: [], parentElement: null,
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    appendChild() {}, removeChild() {}, addEventListener() {}, setAttribute() {}, getAttribute() { return null; },
-    querySelector() { return null; }, querySelectorAll() { return []; }, closest() { return null; },
-    getBoundingClientRect() { return { left: 0, top: 0 }; }, remove() {}
-  });
-  const storage = new Map([['skipbo-name-set', '1']]);
-  const sandbox = {
-    console: qc.obj, setTimeout, clearTimeout, setImmediate, Date, JSON, Math,
-    document: {
-      addEventListener() {}, getElementById: () => fakeEl(), querySelector: () => null,
-      querySelectorAll: () => [], createElement: () => fakeEl(), body: fakeEl(), head: fakeEl(), documentElement: fakeEl()
-    },
-    window: { addEventListener() {}, getComputedStyle: () => ({ top: '0' }), open() {}, scrollX: 0, scrollY: 0 },
-    localStorage: {
-      getItem: k => (storage.has(k) ? storage.get(k) : null),
-      setItem: (k, v) => storage.set(k, String(v)),
-      removeItem: k => storage.delete(k)
-    },
-    location: { reload() {} },
-    confirm: () => false
-  };
-  const ctx = vm.createContext(sandbox);
-  loadInto(ctx, OLDDIR, OLD_FILES);
-  vm.runInContext(`
-    pauseForSeconds = () => Promise.resolve();
-    globalThis.__log = [];
-    globalThis.__humanReady = false;
-    const __origBuild = handleBuildPileDrop;
-    handleBuildPileDrop = function (player, src, idx, pile) {
-      const card = src === 'hand' ? Game.players[player].hand[idx]
-                 : src === 'stock' ? Game.players[player].stock.slice(-1)[0]
-                 : (Game.players[player].discards[idx] || []).slice(-1)[0];
-      const at = __log.length;
-      const ok = __origBuild(player, src, idx, pile);
-      if (ok) __log.splice(at, 0, player + ':' + src + ':' + (card.type === 'joker' ? 'J' : card.value) + '>B' + pile);
-      return ok;
-    };
-    const __origDiscard = handleDiscardPileDrop;
-    handleDiscardPileDrop = function (player, src, idx, pile) {
-      const card = src === 'hand' ? Game.players[player].hand[idx] : null;
-      const ok = __origDiscard(player, src, idx, pile);
-      if (ok) __log.push(player + ':' + src + ':' + (card.type === 'joker' ? 'J' : card.value) + '>D' + pile);
-      return ok;
-    };
-    const __origClear = clearBuildPile;
-    clearBuildPile = function (i) { const was = Game.buildPiles[i].length; __origClear(i); if (Game.buildPiles[i].length === 0 && was > 0) __log.push('CLEAR' + i); };
-    const __origDraw = drawCardsUntilFive;
-    drawCardsUntilFive = function (p) { __origDraw(p); if (p === 'human' && currentPlayer === 'human') __humanReady = true; };
-    globalThis.__api = {
-      async start(rng) { Math.random = rng; await initGame(); },
-      over()          { return isGameOver; },
-      result() {
-        if (!isGameOver) return null;
-        const h = Game.players.human.stock.length, a = Game.players.ai.stock.length;
-        return h === 0 ? { winner: 'human', points: a * 5 } : { winner: 'ai', points: h * 5 };
-      },
-      hand()          { return Game.players.human.hand; },
-      stockTop()      { const s = Game.players.human.stock; return s[s.length - 1] || null; },
-      discardTop(i)   { const d = Game.players.human.discards[i]; return d[d.length - 1] || null; },
-      isValid(c, p)   { return isValidBuildMove(c, p); },
-      build(s, i, p) {
-        if (isGameOver || currentPlayer !== 'human') return false;
-        const wasLast = s === 'hand' && Game.players.human.hand.length === 1;
-        const ok = handleBuildPileDrop('human', s, i, p);
-        if (ok) { if (wasLast) __origDraw('human'); checkForWinner(); }
-        return ok;
-      },
-      discard(i, p) {
-        if (isGameOver || currentPlayer !== 'human') return false;
-        const ok = handleDiscardPileDrop('human', 'hand', i, p);
-        if (ok) switchPlayer();
-        return ok;
-      },
-      pass()          { switchPlayer(); },
-      humanTurn()     { return currentPlayer === 'human'; },
-      game()          { return Game; }
-    };
-  `, ctx, { filename: 'harness-old' });
-  return { ctx, api: ctx.__api, log: () => ctx.__log, warnings: qc.warnings,
-           ready: () => ctx.__humanReady, resetReady: () => { ctx.__humanReady = false; } };
-}
-
-// ================================================================
-// MENSCH-BOT (deterministisch, identisch für beide Engines)
+// MENSCH-BOT (deterministisch)
 // ================================================================
 function humanPlay(api) {
   // Bauzüge in fester Priorität: Stock → Ablage → Hand, jeweils erster gültiger Stapel
@@ -246,7 +154,7 @@ function humanPlay(api) {
     if (!moved) break;
   }
   if (api.over()) return 'over';
-  if (!api.humanTurn()) return 'switched';       // neue Engine: Auto-Pass bei leerer Hand
+  if (!api.humanTurn()) return 'switched';       // Auto-Pass bei leerer Hand
   const hand = api.hand();
   if (hand.length === 0) return 'pass';
   // Ablage: höchste Zahlenkarte (Joker = 0) auf den kleinsten Ablagestapel
@@ -268,7 +176,7 @@ function humanPlay(api) {
 // ================================================================
 // EIN SPIEL SPIELEN
 // ================================================================
-async function playGame(engine, seed, isNew) {
+async function playGame(engine, seed, checkRules) {
   const rng = mulberry32(seed);
   engine.log().length = 0;
   engine.resetReady();
@@ -279,102 +187,85 @@ async function playGame(engine, seed, isNew) {
 
   while (!engine.api.over() && turns < 400) {
     turns++;
-    if (isNew) { invariant = engine.api.check(); if (invariant) break; }
+    if (checkRules) { invariant = engine.api.check(); if (invariant) break; }
     engine.resetReady();
     const mark = engine.log().length;
     const r = humanPlay(engine.api);
     if (r === 'over') break;
-    if (r === 'pass' && !isNew) engine.api.pass();
     if (r === 'failed') { invariant = 'Ablage fehlgeschlagen'; break; }
     // auf die KI warten: bis der Mensch wieder dran ist oder das Spiel vorbei ist
     await waitFor(() => engine.api.over() || engine.ready());
     await tick(); await tick();
-    // Regel (7.0.3): Die KI legt pro Zug höchstens EINE Karte ab
-    if (isNew) {
+    if (checkRules) {
       const n = engine.log().slice(mark).filter(e => e.startsWith('ai:') && e.includes('>D')).length;
       if (n > 1) { invariant = 'KI legt ' + n + ' Karten in einem Zug ab'; break; }
     }
   }
-  if (isNew && !invariant) invariant = engine.api.check();
+  if (checkRules && !invariant) invariant = engine.api.check();
   return { turns, result: engine.api.result(), log: engine.log().slice(), invariant, stuck: turns >= 400 };
-}
-
-/** Log nach dem Zug abschneiden, mit dem ein Stock leer wurde (7.0.0 spielte danach weiter). */
-function truncateAtWin(log) {
-  let hs = 20, as = 20;
-  for (let i = 0; i < log.length; i++) {
-    const e = log[i];
-    if (e.startsWith('human:stock:')) hs--;
-    if (e.startsWith('ai:stock:'))    as--;
-    if (hs === 0 || as === 0) return log.slice(0, i + 1);
-  }
-  return log;
 }
 
 // ================================================================
 // HAUPTPROGRAMM
 // ================================================================
-(async function main() {
-  console.log(`Skipo Prüfstand – ${GAMES} Spiele, Seed ${SEED}${NEWONLY ? ' (nur neue Engine)' : ''}${TAKTIK ? ' (Taktik AN)' : ' (Taktik AUS = 7.0.1-Verhalten)'}`);
+async function main() {
   const t0 = Date.now();
+  const engNew = makeEngine(DIR);
+  const engRef = REF ? makeEngine(REF) : null;
+  console.log(`Skipo Regel-Prüfstand – ${GAMES} Spiele je Kombination, Seed ${SEED}`);
+  console.log(`  geprüft:  ${engNew.page} (${engNew.files.length} Skripte)`);
+  if (engRef) console.log(`  Maßstab:  ${engRef.page} in ${REF} (${engRef.files.length} Skripte)`);
 
-  const engNew = makeNew();
-  let engOld = null;
-  if (!NEWONLY) {
-    const missing = OLD_FILES.filter(f => !fs.existsSync(path.join(OLDDIR, f)));
-    if (missing.length) {
-      console.log(`⚠️  7.0.0-Dateien fehlen in ${OLDDIR}: ${missing.join(', ')} – nur neue Engine wird getestet.`);
-    } else {
-      engOld = makeOld();
-    }
-  }
+  let errors = 0, diffsTotal = 0;
+  const samples = [];
+  for (const level of LEVELS) {
+    for (const planning of PLANNINGS) {
+      engNew.api.setup(level, planning);
+      if (engRef) engRef.api.setup(level, planning);
+      let aiWins = 0, humanWins = 0, moves = 0, stuck = 0, bad = 0, diffs = 0;
+      for (let g = 0; g < GAMES; g++) {
+        const seed = SEED * 1000003 + g;
+        const rNew = await playGame(engNew, seed, true);
+        if (rNew.invariant) { bad++; if (bad <= 3) console.log(`  ❌ ${level}/${planning} Spiel ${g}: ${rNew.invariant}`); }
+        if (rNew.stuck) stuck++;
+        if (rNew.result) { if (rNew.result.winner === 'ai') aiWins++; else humanWins++; }
+        moves += rNew.log.length;
 
-  let aiWins = 0, humanWins = 0, moves = 0, diffs = 0, invariantErrors = 0, stuck = 0;
-  const diffSamples = [];
-
-  for (let g = 0; g < GAMES; g++) {
-    const seed = SEED * 1000003 + g;
-    const rNew = await playGame(engNew, seed, true);
-    if (rNew.invariant) { invariantErrors++; console.log(`❌ Spiel ${g}: Invariante verletzt – ${rNew.invariant}`); }
-    if (rNew.stuck) stuck++;
-    if (rNew.result) { if (rNew.result.winner === 'ai') aiWins++; else humanWins++; }
-    moves += rNew.log.length;
-
-    if (engOld) {
-      const rOld = await playGame(engOld, seed, false);
-      const a = truncateAtWin(rNew.log), b = truncateAtWin(rOld.log);
-      let firstDiff = -1;
-      const n = Math.max(a.length, b.length);
-      for (let i = 0; i < n; i++) if (a[i] !== b[i]) { firstDiff = i; break; }
-      const resSame = JSON.stringify(rNew.result && { w: rNew.result.winner, p: rNew.result.points })
-                   === JSON.stringify(rOld.result && { w: rOld.result.winner, p: rOld.result.points });
-      if (firstDiff >= 0 || !resSame) {
-        diffs++;
-        if (diffSamples.length < 5) {
-          diffSamples.push({ g, seed, firstDiff, neu: a.slice(Math.max(0, firstDiff - 3), firstDiff + 4),
-                             alt: b.slice(Math.max(0, firstDiff - 3), firstDiff + 4), rNew: rNew.result, rOld: rOld.result,
-                             lenNew: a.length, lenOld: b.length });
+        if (engRef) {
+          const rRef = await playGame(engRef, seed, false);
+          const a = rNew.log, b = rRef.log;
+          let firstDiff = -1;
+          const n = Math.max(a.length, b.length);
+          for (let i = 0; i < n; i++) if (a[i] !== b[i]) { firstDiff = i; break; }
+          const same = JSON.stringify(rNew.result && { w: rNew.result.winner, p: rNew.result.points })
+                   === JSON.stringify(rRef.result && { w: rRef.result.winner, p: rRef.result.points });
+          if (firstDiff >= 0 || !same) {
+            diffs++;
+            if (samples.length < 4) samples.push({ level, planning, g, seed, firstDiff,
+              neu: a.slice(Math.max(0, firstDiff - 3), firstDiff + 4), ref: b.slice(Math.max(0, firstDiff - 3), firstDiff + 4) });
+          }
         }
       }
+      errors += bad + stuck; diffsTotal += diffs;
+      const cmp = engRef ? (diffs === 0 ? '  ✅ Zug für Zug gleich' : `  ❌ ${diffs} Spiele weichen ab`) : '';
+      console.log(`  ${(level + '/' + planning).padEnd(14)} Züge ${String(moves).padStart(6)}  KI-Siege ${String(aiWins).padStart(4)}  Bot ${String(humanWins).padStart(4)}` +
+                  `  Regelfehler ${bad}  festgefahren ${stuck}${cmp}`);
     }
-    if ((g + 1) % 50 === 0) console.log(`  … ${g + 1} Spiele`);
   }
+  for (const d of samples) {
+    console.log(`  Abweichung ${d.level}/${d.planning} Spiel ${d.g} (Seed ${d.seed}) bei Zug ${d.firstDiff}`);
+    console.log(`    geprüft: ${d.neu.join('  ')}`);
+    console.log(`    Maßstab: ${d.ref.join('  ')}`);
+  }
+  const warn = engNew.warnings.length;
+  console.log('─'.repeat(72));
+  console.log(`Dauer ${((Date.now() - t0) / 1000).toFixed(1)}s   Regelfehler/festgefahren: ${errors}` +
+              (engRef ? `   Abweichungen zum Maßstab: ${diffsTotal}` : '') +
+              (warn ? `   Warnungen: ${warn} (z. B. "${engNew.warnings[0]}")` : ''));
+  console.log(errors || diffsTotal ? '❌ FEHLER' : '✅ alles in Ordnung');
+  process.exit(errors || diffsTotal ? 1 : 0);
+}
 
-  const sec = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log('─'.repeat(64));
-  console.log(`Spiele: ${GAMES}   Züge gesamt: ${moves}   Dauer: ${sec}s`);
-  console.log(`KI-Siege: ${aiWins}   Bot-Siege: ${humanWins}   festgefahren: ${stuck}`);
-  console.log(`Invarianten-Fehler: ${invariantErrors}`);
-  if (engNew.warnings.length) console.log(`Warnungen neue Engine: ${engNew.warnings.length} (z. B. "${engNew.warnings[0]}")`);
-  if (engOld) {
-    console.log(`Äquivalenz gegen 7.0.0: ${diffs === 0 ? '✅ alle Zugfolgen identisch' : '❌ ' + diffs + ' Spiele weichen ab'}`);
-    for (const d of diffSamples) {
-      console.log(`  Spiel ${d.g} (Seed ${d.seed}) – erste Abweichung bei Zug ${d.firstDiff} (neu ${d.lenNew} / alt ${d.lenOld} Züge)`);
-      console.log(`    neu: ${d.neu.join('  ')}`);
-      console.log(`    alt: ${d.alt.join('  ')}`);
-      console.log(`    Ergebnis neu ${JSON.stringify(d.rNew)} / alt ${JSON.stringify(d.rOld)}`);
-    }
-    if (engOld.warnings.length) console.log(`Warnungen alte Engine: ${engOld.warnings.length}`);
-  }
-  process.exit(invariantErrors || diffs ? 1 : 0);
-})().catch(e => { console.error('Prüfstand abgebrochen:', e); process.exit(2); });
+// Direkt gestartet → Prüfung laufen lassen; per require() → Bausteine für eigene Auswertungen
+if (require.main === module) main().catch(e => { console.error('Prüfstand abgebrochen:', e); process.exit(2); });
+else module.exports = { makeEngine, playGame, humanPlay, mulberry32, scriptList };

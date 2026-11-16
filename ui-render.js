@@ -1,12 +1,12 @@
 // ================================================================
-//  ui-render.js  –  Skipo 7.0.1   Namensraum: Render
+//  ui-render.js  –  Skipo 7.0.4   Namensraum: Render
 //  ANZEIGE: Karten, Felder, Stapel, Meldung, KI-Marker, Hintergrund
 // ----------------------------------------------------------------
 //  Braucht: State, Rules, Events, I18n, Settings     Bietet: Render.*
 //
 //  Reines LESEN von State – hier wird nie Spiellogik entschieden.
-//  Render hört auf Ereignisse und zeichnet. Die HTML-Vorlagen sind
-//  1:1 aus 7.0.0 (Kartenfarben, Glow, Animationen bleiben identisch).
+//  Render hört auf Ereignisse und zeichnet. Kartenfarben, Glow und
+//  Animationen stehen in style.css.
 //
 //  Regel 6: Render.all() ist der eine Einstieg nach Zustandsänderung.
 //  Nach jedem Vollrender wird das Ereignis "render" gesendet (Input
@@ -68,7 +68,7 @@ const Render = {
   },
 
   // ----------------------------------------------------------------
-  // KARTEN-VORLAGEN (1:1 aus 7.0.0)
+  // KARTEN-VORLAGEN
   // ----------------------------------------------------------------
 
   /** Innenleben einer offenen Karte (Joker → SKIP·BO-Logo). */
