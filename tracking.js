@@ -2,7 +2,7 @@
 //  tracking.js  –  Skipo 7.0.4   Namensraum: Tracking
 //  SPIELSTATISTIK BEIDER SEITEN (für den Vergleich im Endscreen)
 // ----------------------------------------------------------------
-//  Braucht: Events, Store, State, Rules     Bietet: Tracking.last, averages()
+//  Braucht: Events, Store, State, Rules, I18n     Bietet: Tracking.last, averages(), reset()
 //
 //  Hört auf Ereignisse (game:start, move:build, turn:change, game:over)
 //  und zählt für Spieler UND KI je Spiel:
@@ -78,6 +78,14 @@ const Tracking = {
     this.history.push(this.last);
     while (this.history.length > 10) this.history.shift();
     Store.set('stats', this.history);
+  },
+
+  /** Gespeicherte Spiele löschen (Menü „Statistik zurücksetzen"). Das laufende Spiel zählt normal weiter. */
+  reset() {
+    this.history = [];
+    this.last    = null;
+    Store.remove('stats');
+    I18n.say('statsReset');
   },
 
   /** Durchschnitt je Seite über die gespeicherten Spiele. */

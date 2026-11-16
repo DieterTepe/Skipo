@@ -2,7 +2,7 @@
 //  ui-menu.js  –  Skipo 7.0.4   Namensraum: Menu
 //  ⚙️-SCHNELLMENÜ UND MENÜAKTIONEN
 // ----------------------------------------------------------------
-//  Braucht: Events, I18n, Overlays     Bietet: Menu.init()
+//  Braucht: Events, I18n, Tracking, Overlays     Bietet: Menu.init()
 //
 //  Die Menü-Buttons im HTML tragen data-action="…"; hier steht zu
 //  jeder Aktion genau eine Funktion. Neuer Menüpunkt = ein Button
@@ -56,7 +56,7 @@ const Menu = {
   /** Menütexte in der aktiven Sprache. */
   texts() {
     const map = { settings: 'qmSettings', design: 'qmDesign', rules: 'qmRules', lang: 'qmLang',
-                  newgame: 'qmNewGame', imprint: 'qmImprint',
+                  newgame: 'qmNewGame', 'stats-reset': 'qmStats', imprint: 'qmImprint',
                   privacy: 'qmPrivacy', close: 'qmClose' };
     this.el.querySelectorAll('[data-action]').forEach(b => {
       const key = map[b.dataset.action];
@@ -70,6 +70,7 @@ const Menu = {
     rules()         { Overlays.showSettings(); },          // Regeln stehen im Einstellungen-Fenster
     lang()          { Overlays.showLanguage(); },
     newgame()       { if (confirm(I18n.t('confirmNewGame'))) location.reload(); },
+    'stats-reset'() { if (confirm(I18n.t('confirmStatsReset', Tracking.history.length))) Tracking.reset(); },
     imprint()       { window.open(Menu.IMPRINT_URL, '_blank'); },
     privacy()       { window.open(Menu.PRIVACY_URL, '_blank'); },
     close()         { /* bereits geschlossen */ }

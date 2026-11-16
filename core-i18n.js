@@ -63,6 +63,7 @@ const I18n = {
     qmRules:      { de:'📖 Spielregeln', en:'📖 Game rules', pt:'📖 Regras do jogo' },
     qmLang:       { de:'🌐 Sprache / Language', en:'🌐 Language', pt:'🌐 Idioma' },
     qmNewGame:    { de:'🔄 Neues Spiel', en:'🔄 New game', pt:'🔄 Novo jogo' },
+    qmStats:      { de:'📊 Statistik zurücksetzen', en:'📊 Reset statistics', pt:'📊 Repor estatísticas' },
     qmImprint:    { de:'📄 Impressum', en:'📄 Legal notice', pt:'📄 Aviso legal' },
     qmPrivacy:    { de:'🔒 Datenschutz', en:'🔒 Privacy', pt:'🔒 Privacidade' },
     qmClose:      { de:'✕ Schließen', en:'✕ Close', pt:'✕ Fechar' },
@@ -99,6 +100,9 @@ const I18n = {
     confirmNewGame:    { de:'Neues Spiel starten? Das aktuelle Spiel wird beendet.',
                          en:'Start a new game? The current game will end.',
                          pt:'Iniciar um novo jogo? O jogo atual será terminado.' },
+    confirmStatsReset: { de:'Statistik zurücksetzen? Die gespeicherten Ergebnisse der letzten {0} Spiele werden gelöscht.',
+                         en:'Reset statistics? The saved results of the last {0} games will be deleted.',
+                         pt:'Repor estatísticas? Os resultados guardados dos últimos {0} jogos serão apagados.' },
 
     // ── Spielende ──
     endTitle:     { de:'🏁 Spiel beendet!', en:'🏁 Game over!', pt:'🏁 Fim do jogo!' },
@@ -167,6 +171,7 @@ const I18n = {
     notAllowed:   { de:'❌ Dieser Zug ist nicht erlaubt', en:'❌ This move is not allowed', pt:'❌ Esta jogada não é permitida' },
     stockNoDiscard:{ de:'❌ {0}: Stockkarten dürfen nicht abgelegt werden!', en:'❌ {0}: stock cards must not be discarded!', pt:'❌ {0}: cartas de reserva não podem ir para o descarte!' },
     selectFirst:  { de:'⚠️ Bitte zuerst eine Karte auswählen', en:'⚠️ Please select a card first', pt:'⚠️ Primeiro escolhe uma carta' },
+    statsReset:   { de:'📊 Statistik zurückgesetzt', en:'📊 Statistics reset', pt:'📊 Estatísticas repostas' },
     nameChanged:  { de:'✅ Spielername geändert: {0}', en:'✅ Player name changed: {0}', pt:'✅ Nome do jogador alterado: {0}' },
 
     // ── Statusmeldungen: KI ──

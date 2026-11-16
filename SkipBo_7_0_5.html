@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!--
+  ================================================================
+  SKIPO (Skip-Bo Mobile) – VERSION 7.0.5   (15.11.2026)
+  ----------------------------------------------------------------
+  Aufgeräumte Version: Der Ordner enthält nur noch diese Version.
+  Vier Schichten (core → ai → flow/tracking → ui), ein Namensraum je
+  Datei, Ereignisbus, Meldungsschlüssel, ein Speicher-Zugang.
+
+  Gegenüber 7.0.3:
+    • Tempo-Regler 0–2 s in 0,1-Schritten, Standard 0.
+    • Tuner-Auswertung entfernt; der Vergleich beider Seiten bleibt.
+    • KI-Code bereinigt (Versuchsschalter und tote Altlogik entfernt,
+      eine Konfigurationsdatei ai-config.js). Die KI spielt in jeder
+      Stufe Zug für Zug wie 7.0.3 (mit test-sim.js geprüft).
+    • Vorversionen 6.6.0 / 7.0.0 entfernt; alte Startadressen leiten weiter.
+
+  Alle Dateien liegen FLACH im Ordner Skipo (kein Unterordner).
+  Ladereihenfolge = Abhängigkeit (siehe Projekt.md).
+  Bei einem Release alle "?v=7.0.5" gemeinsam hochzählen.
+  ================================================================
+-->
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+             user-scalable=no, viewport-fit=cover"
+  >
+  <meta name="theme-color"                             content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable"            content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style"   content="black-translucent">
+  <title>Skipo – Skip-Bo Mobile v7.0.5</title>
+
+  <link rel="stylesheet" href="https://dietertepe.github.io/Skipo/style.css?v=7.0.5">
+</head>
+<body>
+
+  <!-- STATUS-BALKEN (verschiebbar) -->
+  <div id="status-label">
+    <span id="status-text">🎮 Spielstart: Karten werden gemischt...</span>
+  </div>
+
+  <!-- ⚙️-MENÜ-BUTTON (separat vom Label, damit Drag ihn nicht blockiert) -->
+  <button id="menu-btn" title="Menü">⚙️</button>
+
+  <!-- SCHNELLMENÜ: jeder Button trägt data-action → Menu.actions -->
+  <div id="quick-menu">
+    <div id="app-version" class="qm-version">Skipo v7.0.5</div>
+    <button class="qm-btn" data-action="settings"></button>
+    <button class="qm-btn" data-action="design"></button>
+    <button class="qm-btn" data-action="rules"></button>
+    <button class="qm-btn" data-action="lang"></button>
+    <button class="qm-btn" data-action="newgame"></button>
+    <button class="qm-btn" data-action="stats-reset"></button>
+    <button class="qm-btn" data-action="imprint"></button>
+    <button class="qm-btn" data-action="privacy"></button>
+    <button class="qm-btn qm-btn-close" data-action="close"></button>
+  </div>
+
+  <div class="game-container">
+
+    <!-- GEGNER-BEREICH -->
+    <section class="opponent-area">
+      <div class="hand" id="opponentHand"></div>
+      <div class="main-piles">
+        <div class="field stock"></div>
+        <div class="field discard-field"></div>
+        <div class="field discard-field"></div>
+        <div class="field discard-field"></div>
+        <div class="field discard-field"></div>
+      </div>
+    </section>
+
+    <!-- BAU-BEREICH -->
+    <section class="build-area">
+      <div class="main-piles">
+        <div class="field draw-pile"></div>
+        <div class="field build-pile"></div>
+        <div class="field build-pile"></div>
+        <div class="field build-pile"></div>
+        <div class="field build-pile"></div>
+      </div>
+    </section>
+
+    <!-- SPIELER-BEREICH -->
+    <section class="human-area">
+      <div class="main-piles">
+        <div class="field discard-field"></div>
+        <div class="field discard-field"></div>
+        <div class="field discard-field"></div>
+        <div class="field discard-field"></div>
+        <div class="field stock"></div>
+      </div>
+      <div class="hand" id="playerHand"></div>
+    </section>
+
+  </div><!-- /.game-container -->
+
+  <!-- INFO-FENSTER (Ablagestapel-Inhalt bei langem Drücken) -->
+  <div id="info-window">
+    <table id="info-table"></table>
+  </div>
+
+  <!-- ── core: Fundament (kein DOM) ── -->
+  <script src="https://dietertepe.github.io/Skipo/core-events.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/core-store.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/core-settings.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/core-i18n.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/core-state.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/core-rules.js?v=7.0.5"></script>
+  <!-- ── ai: Künstliche Intelligenz (kein DOM) ── -->
+  <script src="https://dietertepe.github.io/Skipo/ai-config.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ai-turn.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ai-planner.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ai-eval.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ai-analysis.js?v=7.0.5"></script>
+  <!-- ── flow + tracking ── -->
+  <script src="https://dietertepe.github.io/Skipo/core-flow.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/tracking.js?v=7.0.5"></script>
+  <!-- ── ui: Oberfläche ── -->
+  <script src="https://dietertepe.github.io/Skipo/ui-render.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ui-input.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ui-menu.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ui-overlays.js?v=7.0.5"></script>
+  <!-- ── Start ── -->
+  <script src="https://dietertepe.github.io/Skipo/app.js?v=7.0.5"></script>
+</body>
+</html>
