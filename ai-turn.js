@@ -41,6 +41,16 @@ const AI = {
     return Settings.planning === 'normal';
   },
 
+  /**
+   * Karten des eigenen Stocks, mit denen die KI rechnen darf:
+   * „Superstark" alle (auch die verdeckten), „Normal" nur die oberste.
+   * JEDE Stelle der KI, die mehr als die oberste Stockkarte braucht, fragt hier.
+   */
+  knownStock() {
+    const stock = State.player('ai').stock;
+    return this.fairStock() ? stock.slice(-1) : stock;
+  },
+
   /** Statusmeldung (Schlüssel + Werte). */
   say(key, ...args) { I18n.say(key, ...args); },
 

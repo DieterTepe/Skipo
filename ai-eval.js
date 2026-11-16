@@ -157,7 +157,7 @@ AI.Eval = {
           else                                score += KONFIG.SCORE_27;
         } catch (e) { score += KONFIG.SCORE_27; }
 
-        if (me.stock.some(s => s.value === card.value + 1)) score += KONFIG.SCORE_23;
+        if (AI.knownStock().some(s => s.value === card.value + 1)) score += KONFIG.SCORE_23;
 
         if (KONFIG.SCORE_36 > 0) {
           me.discards.forEach((jokerPile, jpi) => {
@@ -404,7 +404,7 @@ AI.Eval = {
 
   /** Wird dieser Joker-Wert im KI-Stock benötigt? */
   neededForStock(jokerValue) {
-    return State.player('ai').stock.some(c => c.type === 'number' && c.value === jokerValue);
+    return AI.knownStock().some(c => c.type === 'number' && c.value === jokerValue);
   },
 
   /** Kartenwerte, die dem menschlichen Gegner direkt helfen (Stock-Top+1, Ablage-Tops+1). */

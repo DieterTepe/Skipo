@@ -127,7 +127,8 @@ AI.Analysis = {
         const followUpCount = this.jokerFollowUps(pileIdx, jokerAsVal);
         if (followUpCount < KONFIG.JOKER_NO_FOLLOWUP_THRESHOLD && KONFIG.JOKER_STOCK_AGGRESSION < 0.8) continue;
 
-        const ourNextStock = ai.stock.length > 1 ? ai.stock[ai.stock.length - 2]?.value : null;
+        const known        = AI.knownStock();       // „Normal": nur die oberste Karte, also keine nächste
+        const ourNextStock = known.length > 1 ? known[known.length - 2]?.value : null;
         const directStockBenefit = ourNextStock && (jokerAsVal === ourNextStock - 1 || jokerAsVal === ourNextStock);
 
         if (bestPile === -1 || (directStockBenefit && bestFollowUp < followUpCount) || followUpCount > bestFollowUp) {
