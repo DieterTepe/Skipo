@@ -23,7 +23,7 @@ const Settings = {
     speed:   0,                          // Sekunden je Pauseneinheit, 0–2 in 0,1-Schritten
     bg:      { h: 130, s: 60, l: 19 },   // bisheriges Grün (#1B5E20)
     nameSet: false,                      // false → Einstellungen beim ersten Start zeigen
-    level:    'hard',                    // KI-Schwierigkeit: 'easy' | 'medium' | 'hard' | 'pro'
+    level:    'pro',                     // KI-Schwierigkeit: 'easy' | 'medium' | 'hard' | 'pro'
     planning: 'super'                    // KI-Planung: 'super' (mit verdeckten eigenen Stockkarten) | 'normal'
   },
 
@@ -46,7 +46,7 @@ const Settings = {
   speed:   0,
   bg:      { h: 130, s: 60, l: 19 },
   nameSet: false,
-  level:    'hard',
+  level:    'pro',
   planning: 'super',
 
   /** Beim Start: Altlasten löschen, dann alle Werte laden und prüfen. */

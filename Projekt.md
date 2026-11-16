@@ -1,25 +1,25 @@
-# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.4
+# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.5
 
 > **Zweck dieser Datei:** Übergabe-Dokument. Wer einen neuen Chat startet, liest
 > zuerst diese Datei und weiß sofort, was Stand, Regeln, Entscheidungen und
 > nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
-**Letzte Aktualisierung:** 16.11.2026 — **7.0.4 ist live** (von Dieter freigegeben, `main`).
-7.0.4 ist die Aufräum-Version: Der Ordner enthält nur noch diese eine Version, die KI
-spielt gleich stark wie 7.0.3. Dieters Live-Test steht noch aus. Danach geplant: 7.0.5
-mit neuen KI-Ideen (Abschnitt 7).
+**Letzte Aktualisierung:** 16.11.2026 — **7.0.5 ist live** (von Dieter freigegeben, `main`).
+Neu: vierte Stufe **Profi** (Standard) – wie Schwer, zusätzlich spielt die KI ihre Ablage
+voraus (53,3 % gegen Schwer). Menüpunkt „Statistik zurücksetzen". Leicht, Mittel und
+Schwer spielen Zug für Zug wie 7.0.4. Dieters Live-Test von 7.0.5 steht noch aus.
 
 ---
 
 ## 0. Kurzfassung für den schnellen Einstieg
 
-- **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_4.html` – GitHub Pages, Repo
-  `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.4`.
-  Die alten Adressen `SkipBo_7_0_2.html` und `SkipBo_7_0_3.html` leiten weiter.
+- **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_5.html` – GitHub Pages, Repo
+  `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.5`.
+  Die alten Adressen `SkipBo_7_0_2.html` bis `SkipBo_7_0_4.html` leiten weiter.
 - **Architektur:** vier Schichten (core → ai → flow/tracking → ui), ein Namensraum je
   Datei, Ereignisbus, Meldungsschlüssel (DE/EN/PT), ein Speicher-Zugang. Kein DOM in
   core/ai/flow/tracking → alles läuft in Node und ist simulierbar.
-- **KI:** drei Stufen (Leicht / Mittel / **Schwer** = Standard) und zwei Planungsarten
+- **KI:** vier Stufen (Leicht / Mittel / Schwer / **Profi** = Standard) und zwei Planungsarten
   (**Superstark** = Standard / Normal), wählbar in den Einstellungen. Alle Zahlen der KI
   stehen in **einer** Datei `ai-config.js`.
 - **Stärke im echten Spiel (Dieter, 15.11.2026):** Schwer + Superstark gewinnt gegen einen
@@ -63,6 +63,8 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)                                      
 │                               applyBlockade · Einzelbewertungen
 ├── ai-analysis.js    AI.Analysis predictEnemyStock · threat · usefulForStock ·        315
 │                               jokerStockTop · jokerHand · jokerCombo · handCombo
+├── ai-lookahead.js   AI.Look     Vorausspielen (Stufe Profi): clone · shuffleHidden ·  150
+│                               playTurns · value · choose(options, apply, cfg)
 │
 │  ── flow + tracking, KEIN DOM ──
 ├── core-flow.js      Flow      startGame · humanBuild · humanDiscard · _aiRound ·     129
@@ -80,9 +82,8 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)                                      
 ├── app.js            App       init(), VERSION                                         41
 │
 │  ── Seiten ──
-├── SkipBo_7_0_4.html     Startseite: DOM-Gerüst, keine onclick=, keine Inline-Styles
-├── SkipBo_7_0_2.html     Weiterleitung auf die Startseite (alte Adresse)
-├── SkipBo_7_0_3.html     Weiterleitung auf die Startseite (alte Adresse)
+├── SkipBo_7_0_5.html     Startseite: DOM-Gerüst, keine onclick=, keine Inline-Styles
+├── SkipBo_7_0_2.html … SkipBo_7_0_4.html   Weiterleitungen auf die Startseite (alte Adressen)
 ├── style.css             alle Stile                                                   958
 ├── impressum.html / datenschutz.html    „Zurück"-Link auf die Startseite
 │
@@ -96,7 +97,7 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)                                      
 **Gesichert, aber nicht mehr im Ordner:** Zweig `stand-7.0.3` = letzter Stand vor dem
 Aufräumen (enthält auch 6.6.0, 7.0.0, den Tuner und die 56 Versuchsschalter). Dieter hat
 zusätzlich eine ZIP. Wiederherstellen einer Datei: `git show stand-7.0.3:DATEI`.
-Zweig `stand-7.0.4` = Stand dieser Freigabe (Maßstab für den nächsten Umbau).
+Zweige `stand-7.0.4` und `stand-7.0.5` = Stände der Freigaben (Maßstab für den nächsten Umbau).
 
 ---
 
@@ -163,7 +164,14 @@ welche Quelle.
 |---|---|
 | **Leicht** `easy` | keine Blockade; Joker werden über die Heuristik gespielt |
 | **Mittel** `medium` | Blockade: Karte V−1 nicht spielen (V = sichtbare Stockkarte des Gegners), außer die KI kann selbst mit V oder Joker zudecken; V−2 nicht bei sichtbarer Brücke. Joker nur in Planer-Ketten, am Zugende nur mit Folgekarten |
-| **Schwer** `hard` (Standard) | zusätzlich: Joker am Zugende behalten und nie ablegen (`JOKER_KEEP`), Ablage behält Karten für die eigene Stockkarte und legt Doppelte zuerst ab (`DISC_KEEP_USEFUL`, `DISC_DUP`), Sicherheitsabstand 3 (`AVOID_DIST`), Handkarte vor Ablagekarte (`PREFER_HAND`) |
+| **Schwer** `hard` | zusätzlich: Joker am Zugende behalten und nie ablegen (`JOKER_KEEP`), Ablage behält Karten für die eigene Stockkarte und legt Doppelte zuerst ab (`DISC_KEEP_USEFUL`, `DISC_DUP`), Sicherheitsabstand 3 (`AVOID_DIST`), Handkarte vor Ablagekarte (`PREFER_HAND`) |
+| **Profi** `pro` (Standard) | wie Schwer; vor dem Ablegen spielt die KI die 6 besten Möglichkeiten je 8-mal 4 Halbzüge voraus (`LOOK_*`, `ai-lookahead.js`) und nimmt den besten Durchschnitt. Rund 50 ms je Zug am Rechner, Obergrenze 400 ms |
+
+**Vorausspielen (AI.Look):** Spielfeld kopieren → alles Verdeckte (Gegnerhand,
+Nachziehstapel, verdeckte Stockkarten) zufällig neu verteilen – das ist Kartenzählen: Verteilt
+werden genau die Karten, die nicht sichtbar sind → Möglichkeit ausführen → mit der normalen
+KI weiterspielen → Stockvorsprung bewerten. Währenddessen ist das Spiel stumm
+(`Events.muted`, `Clock.instant`, eigener Zufall); danach ist alles wie vorher.
 
 **KI-Planung** (`Settings.planning`): **Superstark** `super` (Standard) rechnet mit allen
 Karten des eigenen Stocks, auch den verdeckten. **Normal** `normal` kennt nur die oberste –
@@ -181,6 +189,7 @@ Die 10-Spiele-Durchschnitte im Endscreen mischen Spiele verschiedener Stufen.
 | Schwer gegen Mittel | 69,8 % |
 | Schwer gegen Leicht | 75,3 % |
 | Normal gegen Superstark (Schwer) | 45,6 % |
+| **Profi gegen Schwer** (2 × 1000 Paare) | **53,5 % / 53,1 %** |
 | Schwer + Superstark gegen den einfachen Bot | 92,5 % |
 | **Schwer + Superstark gegen sehr starken Menschen (Dieter, echt)** | **≈ 70 %** |
 
@@ -200,6 +209,7 @@ Wirkung haben nur echte Entscheidungen. Verschobene Bewertungszahlen sortieren n
 | Handkarte statt Ablagekarte, wenn beide dieselbe Karte bieten (umgekehrt −3,3) | +3,5 |
 | Sicherheitsabstand 3 statt 1 (4 und 5: +1, 6: ±0) | +2 |
 | Planer rechnet mit verdeckten eigenen Stockkarten (= Superstark) | +4 |
+| Ablage vorausspielen, Tiefe 4 (= Profi). Tiefe 2: +1, Tiefe 6: gleich, Tiefe 8: weniger | +3,3 |
 
 **Ohne Gewinn oder schädlich (wieder entfernt):**
 
@@ -215,7 +225,13 @@ Wirkung haben nur echte Entscheidungen. Verschobene Bewertungszahlen sortieren n
 | Blockierte Karte zuerst ablegen (300: +1; 1000: −3); Deckkarte behalten | ±0 |
 | Rundlauf 12→1 beachten; Wettlauf-Ausnahme bei kleinem eigenem Stock (−0,8 / −1,7) | ±0 / negativ |
 | Planer: offenes Kettenende meiden, Risikoprüfung immer, mehr Suchknoten/Tiefe, Hand leeren bevorzugen, Handkarten zuerst (−1,5) | ±0 |
+| **Blockade nach Wahrscheinlichkeit** (Dieters Idee). Orakel-Test: KI kennt die Gegnerhand und blockiert nur, wenn er die Lücke wirklich schließen kann | 50,5 %; zusätzlich zur Abstandsregel 51,4 % → Obergrenze ≈ +1. Der feste Abstand schützt über mehrere Züge, nicht nur für den nächsten |
+| Rückschluss „was der Gegner nicht gelegt hat" beim Verteilen der Karten im Vorausspielen | 51,3 % statt ≈ 53–55 % ohne → kein Gewinn |
 | 71 Tuner-Werte einzeln ×0 / ×0,5 / ×2 | 54 ohne jede Wirkung, Rest Rauschen |
+
+**Obergrenze der Ablage:** Eine KI, die beim Ablegen die echte Zukunft kennt, gewinnt 95 %.
+Fast alles davon ist Wissen über künftige Karten; faires Vorausspielen holt davon ≈ 3 Punkte.
+Rechenaufwand der Messung: 300 Paare mit Profi ≈ 20 Minuten.
 
 **Aufräumen 7.0.4 – was dabei belegt wurde:**
 - 31 der 71 KONFIG-Werte änderten in keiner Stufe einen Zug; 20 davon waren im Code
@@ -233,7 +249,7 @@ Wirkung haben nur echte Entscheidungen. Verschobene Bewertungszahlen sortieren n
 
 ### 6.1 test-sim.js – „Stimmen die Regeln? Hat der Umbau etwas verändert?"
 ```
-node test-sim.js 300 7                          # alle sechs Kombinationen, je 300 Spiele
+node test-sim.js 300 7                          # alle acht Kombinationen, je 300 Spiele (Profi: 30)
 node test-sim.js 2000 41 --ref=../skipo-ref     # zusätzlich Zug für Zug gegen einen Maßstab
 node test-sim.js 300 7 --stufe=hard --planung=super
 ```
@@ -289,7 +305,11 @@ Ob Pages ausliefert, kann Claude nicht abfragen → Dieter öffnet die Adresse e
 
 ## 7. Nächste Schritte
 
-**7.0.5 – KI-Ideen (besprochen am 15.11.2026):**
+**Erledigt in 7.0.5:** Beide Ideen vom 15.11.2026 sind gemessen (Abschnitt 5). Übrig als Idee:
+Vorausspielen auch für das Zugverhalten (Versuchscode lag vor, nicht gemessen), mehr
+Verteilungen oder frühes Aussortieren schwacher Möglichkeiten.
+
+**Ursprünglicher Plan (zur Einordnung):**
 1. **Wahrscheinlichkeiten (Dieters Idee).** Fertige Baustapel werden sofort
    zurückgemischt, die unbekannten Karten sind also immer „alle minus die sichtbaren" –
    die KI muss sich nichts merken. Erwartung: 1–3 Punkte. Das Zählen allein verschiebt
@@ -302,7 +322,7 @@ Ob Pages ausliefert, kann Claude nicht abfragen → Dieter öffnet die Adresse e
    größter Aufwand, Rechenzeit auf dem Handy. Erst im Prüfstand messen, nur bei klarem
    Gewinn fürs Spiel bauen.
 3. Bei 70 % gegen einen sehr starken Menschen ist ein großer Teil des Rests Kartenglück.
-   Offen: Soll eine stärkere KI „Schwer" ersetzen oder eine vierte Stufe werden?
+   Entschieden (16.11.2026): vierte Stufe „Profi", sie ist der neue Standard.
 
 **Ideenpool (Reihenfolge = Vorschlag):** Soundeffekte · Spielerstatistik erweitern
 (Siegesserie, Verlauf; Basis `Tracking.history`) · Farbenblind-Modus · weitere
@@ -319,8 +339,8 @@ Kartenrückseiten · Pass-and-Play · interaktives Tutorial · Querformat-Seiten
   mehr unterstützt; gespeicherte Altdaten werden beim Start gelöscht, nicht übernommen.
 - Der externe Tuner wird nicht mehr benutzt; die Tuner-Auswertung im Spiel ist entfernt.
   Maßstab für KI-Änderungen ist allein die gemessene Siegrate.
-- Stufen Leicht / Mittel / Schwer und Planung Superstark / Normal; Standard Schwer +
-  Superstark. Die Abstufung passt (Dieter, 15.11.2026).
+- Stufen Leicht / Mittel / Schwer / Profi und Planung Superstark / Normal; Standard Profi +
+  Superstark (Dieter, 16.11.2026). Wer schon eine Stufe gespeichert hat, behält sie.
 - Tempo 0–2 s in 0,1-Schritten, Standard 0 (mehr nur zum Nachvollziehen oder für Laien).
 - Aufräumen und KI-Stärke nie in derselben Version (sonst ist unklar, woher eine
   Änderung der Stärke kommt).
@@ -357,3 +377,4 @@ Kartenrückseiten · Pass-and-Play · interaktives Tutorial · Querformat-Seiten
 | 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Vergleich beider Seiten im Endscreen, tune-sim.js |
 | 7.0.3 | 14.11.2026 | Joker am Zugende behalten, Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. Stufen und KI-Planung in den Einstellungen. Echt: ≈ 70 % gegen sehr starken Menschen |
 | 7.0.4 | 15.11.2026 | Aufräumen: nur noch diese Version im Ordner (19 000 → 5 700 Zeilen, KI 2 570 → 1 600), Tuner-Auswertung entfernt, eine KI-Konfigurationsdatei, Tempo 0–2 s (Standard 0), „Normal" gilt überall. KI gleich stark wie 7.0.3. Live seit 16.11.2026 (Freigabe Dieter) |
+| 7.0.5 | 16.11.2026 | Stufe Profi (Standard): Ablage vorausspielen, 53,3 % gegen Schwer. Menüpunkt „Statistik zurücksetzen". Einstellungsfenster als Spalte. Wahrscheinlichkeits-Blockade gemessen und verworfen. Live seit 16.11.2026 (Freigabe Dieter) |
