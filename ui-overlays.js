@@ -1,5 +1,5 @@
 // ================================================================
-//  ui-overlays.js  –  Skipo 7.0.4   Namensraum: Overlays
+//  ui-overlays.js  –  Skipo 7.0.5   Namensraum: Overlays
 //  EINSTELLUNGEN · DESIGN · SPRACHE · SPIELENDE · INFO-FENSTER
 // ----------------------------------------------------------------
 //  Braucht: State, Events, I18n, Settings, Tracking     Bietet: Overlays.*
@@ -70,6 +70,7 @@ const Overlays = {
             <button type="button" data-v="easy"></button>
             <button type="button" data-v="medium"></button>
             <button type="button" data-v="hard"></button>
+            <button type="button" data-v="pro"></button>
           </div>
         </div>
         <div class="ki-row">
@@ -121,7 +122,7 @@ const Overlays = {
     ov.querySelector('#speed-value').textContent = this.speedText(Settings.speed);
     this.kiSelect('ki-level', Settings.level);
     this.kiSelect('ki-plan',  Settings.planning);
-    ov.style.display = 'block';
+    ov.style.display = 'flex';
   },
 
   /** Tempo-Anzeige mit einer Nachkommastelle in der Schreibweise der Sprache (0,5 s / 0.5 s). */

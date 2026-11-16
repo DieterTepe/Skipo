@@ -1,5 +1,5 @@
 // ================================================================
-//  ai-planner.js  –  Skipo 7.0.4   Namensraum: AI.Planner
+//  ai-planner.js  –  Skipo 7.0.5   Namensraum: AI.Planner
 //  ZUGKETTEN-PLANER (Tiefensuche mit Besucht-Speicher)
 // ----------------------------------------------------------------
 //  Braucht: AI, KI_PLANNER, State, Rules, Clock, I18n

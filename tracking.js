@@ -1,5 +1,5 @@
 // ================================================================
-//  tracking.js  –  Skipo 7.0.4   Namensraum: Tracking
+//  tracking.js  –  Skipo 7.0.5   Namensraum: Tracking
 //  SPIELSTATISTIK BEIDER SEITEN (für den Vergleich im Endscreen)
 // ----------------------------------------------------------------
 //  Braucht: Events, Store, State, Rules, I18n     Bietet: Tracking.last, averages(), reset()

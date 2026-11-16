@@ -7,6 +7,8 @@
 //  Kartenglück und Anfangsvorteil auf; übrig bleibt die Stärke.
 //
 //  Jede Seite = Stufe/Planung (wie in den Einstellungen) + Änderungen.
+//  Stufen: easy | medium | hard | pro. „pro" spielt voraus und ist rund
+//  30-mal langsamer (300 Paare ≈ 20 Minuten).
 //  Standard für beide: hard/super. Änderungen gelten für B; mit dem
 //  Vorsatz „A:" für A.
 //      S:KEY=WERT   Wert der Stufe          (KI_STUFEN[stufe].KEY)
@@ -124,7 +126,7 @@ function parseValue(v) {
 }
 function makeSide(spec, sets, base) {
   const [level, planning] = String(spec).split('/');
-  if (!(level in base.stufen)) throw new Error('Unbekannte Stufe: ' + level + ' (easy | medium | hard)');
+  if (!(level in base.stufen)) throw new Error('Unbekannte Stufe: ' + level + ' (easy | medium | hard | pro)');
   if (!['super', 'normal'].includes(planning)) throw new Error('Unbekannte Planung: ' + planning + ' (super | normal)');
   const side = { level, planning, stufe: {}, planner: {}, konfig: {} };
   for (const s of sets) {

@@ -1,19 +1,18 @@
 <!DOCTYPE html>
 <!--
   ================================================================
-  SKIPO (Skip-Bo Mobile) – VERSION 7.0.5   (15.11.2026)
+  SKIPO (Skip-Bo Mobile) – VERSION 7.0.5   (16.11.2026)
   ----------------------------------------------------------------
-  Aufgeräumte Version: Der Ordner enthält nur noch diese Version.
   Vier Schichten (core → ai → flow/tracking → ui), ein Namensraum je
   Datei, Ereignisbus, Meldungsschlüssel, ein Speicher-Zugang.
 
-  Gegenüber 7.0.3:
-    • Tempo-Regler 0–2 s in 0,1-Schritten, Standard 0.
-    • Tuner-Auswertung entfernt; der Vergleich beider Seiten bleibt.
-    • KI-Code bereinigt (Versuchsschalter und tote Altlogik entfernt,
-      eine Konfigurationsdatei ai-config.js). Die KI spielt in jeder
-      Stufe Zug für Zug wie 7.0.3 (mit test-sim.js geprüft).
-    • Vorversionen 6.6.0 / 7.0.0 entfernt; alte Startadressen leiten weiter.
+  Gegenüber 7.0.4:
+    • Neue Stufe „Profi": wie Schwer, zusätzlich spielt die KI vor dem
+      Ablegen die besten Möglichkeiten voraus (ai-lookahead.js).
+      Leicht, Mittel und Schwer spielen Zug für Zug wie 7.0.4.
+    • Menüpunkt „Statistik zurücksetzen".
+    • Einstellungsfenster teilt seinen Platz selbst auf (vier Stufen
+      passen auch auf kleine Handys).
 
   Alle Dateien liegen FLACH im Ordner Skipo (kein Unterordner).
   Ladereihenfolge = Abhängigkeit (siehe Projekt.md).
@@ -116,6 +115,7 @@
   <script src="https://dietertepe.github.io/Skipo/ai-planner.js?v=7.0.5"></script>
   <script src="https://dietertepe.github.io/Skipo/ai-eval.js?v=7.0.5"></script>
   <script src="https://dietertepe.github.io/Skipo/ai-analysis.js?v=7.0.5"></script>
+  <script src="https://dietertepe.github.io/Skipo/ai-lookahead.js?v=7.0.5"></script>
   <!-- ── flow + tracking ── -->
   <script src="https://dietertepe.github.io/Skipo/core-flow.js?v=7.0.5"></script>
   <script src="https://dietertepe.github.io/Skipo/tracking.js?v=7.0.5"></script>

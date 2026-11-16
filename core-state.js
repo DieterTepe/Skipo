@@ -1,5 +1,5 @@
 // ================================================================
-//  core-state.js  –  Skipo 7.0.4   Namensraum: State
+//  core-state.js  –  Skipo 7.0.5   Namensraum: State
 //  ZENTRALER SPIELZUSTAND
 // ----------------------------------------------------------------
 //  Braucht: nichts        Bietet: State.game, State.turn, State.reset

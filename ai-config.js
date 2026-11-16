@@ -1,9 +1,9 @@
 // ================================================================
-//  ai-config.js  –  Skipo 7.0.4   Namensräume: KI_STUFEN, KI_PLANNER, KONFIG
+//  ai-config.js  –  Skipo 7.0.5   Namensräume: KI_STUFEN, KI_PLANNER, KONFIG
 //  ALLE ZAHLEN DER KI AN EINEM ORT (reine Daten, kein Code)
 // ----------------------------------------------------------------
 //  Braucht: nichts     Wird gelesen von: ai-turn / ai-planner /
-//                                         ai-eval / ai-analysis
+//                                         ai-eval / ai-analysis / ai-lookahead
 //
 //  1. KI_STUFEN  – was die Schwierigkeit ausmacht (Einstellungen im Spiel)
 //  2. KI_PLANNER – Grenzen des Zugketten-Planers
@@ -21,6 +21,8 @@
 //            zudecken), V-2 nicht bei sichtbarer Brücke; Joker nur in
 //            Planer-Ketten, am Zugende mit Folgekarten.
 //   Schwer : zusätzlich die fünf Werte unten.
+//   Profi  : wie Schwer, und vor dem Ablegen spielt die KI die besten
+//            Möglichkeiten voraus (AI.Look, LOOK_*).
 // Gemessen (2000 gepaarte Spiele): Mittel gegen Leicht 58 %,
 // Schwer gegen Mittel 70 %, Schwer gegen Leicht 75 %.
 const KI_STUFEN = {
@@ -30,16 +32,27 @@ const KI_STUFEN = {
     JOKER_KEEP:       false,   // Joker am Zugende in der Hand behalten und nie ablegen
     DISC_KEEP_USEFUL: 0,       // Ablage: Gewicht „Karte führt zur eigenen Stockkarte → behalten"
     DISC_DUP:         0,       // Ablage: Bonus „doppelt gehaltenen Wert zuerst ablegen"
-    PREFER_HAND:      false    // gleiche Karte in Hand und Ablage → Handkarte spielen
+    PREFER_HAND:      false,   // gleiche Karte in Hand und Ablage → Handkarte spielen
+    LOOK_OPTIONS:     0,       // Vorausspielen: so viele Ablage-Möglichkeiten vergleichen (0 = aus)
+    LOOK_SAMPLES:     8,       // … je Möglichkeit so viele zufällige Kartenverteilungen
+    LOOK_DEPTH:       4,       // … so viele Halbzüge weit (Gegner, ich, Gegner, ich)
+    LOOK_MS:          400      // … höchstens so viele Millisekunden (0 = ohne Grenze)
   },
   hard: {
     AVOID_DIST:       3,       // auch V-2 und V-3 nicht spielen (4/5 brachten +1, 6 ±0)
     JOKER_KEEP:       true,    // +10 Punkte gegenüber „am Zugende einzeln verspielen"
     DISC_KEEP_USEFUL: 1500,    // zusammen mit DISC_DUP +4 Punkte
     DISC_DUP:         600,
-    PREFER_HAND:      true     // +3,5 Punkte (umgekehrt gemessen: −3,3)
+    PREFER_HAND:      true,    // +3,5 Punkte (umgekehrt gemessen: −3,3)
+    LOOK_OPTIONS:     0,
+    LOOK_SAMPLES:     8,
+    LOOK_DEPTH:       4,
+    LOOK_MS:          400
   }
 };
+// Profi = Schwer + Vorausspielen. Gemessene Werte: Tiefe 2 bringt nichts, 4 und 6 gleich viel,
+// 8 weniger; 6 Möglichkeiten × 8 Verteilungen kosten rund 65 ms je Zug (Rechner).
+KI_STUFEN.pro = Object.assign({}, KI_STUFEN.hard, { LOOK_OPTIONS: 6 });
 
 // ── 2. ZUGKETTEN-PLANER ─────────────────────────────────────────
 const KI_PLANNER = {

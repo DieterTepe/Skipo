@@ -1,5 +1,5 @@
 // ================================================================
-//  ai-eval.js  –  Skipo 7.0.4   Namensraum: AI.Eval
+//  ai-eval.js  –  Skipo 7.0.5   Namensraum: AI.Eval
 //  BEWERTUNG DER EINZELZÜGE (Heuristik, nutzt KONFIG)
 // ----------------------------------------------------------------
 //  Braucht: AI, KONFIG, State, Rules     Bietet: AI.Eval.candidates()

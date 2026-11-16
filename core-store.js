@@ -1,5 +1,5 @@
 // ================================================================
-//  core-store.js  –  Skipo 7.0.4   Namensraum: Store
+//  core-store.js  –  Skipo 7.0.5   Namensraum: Store
 //  EIN ZUGANG ZU localStorage
 // ----------------------------------------------------------------
 //  Braucht: nichts        Bietet: Store.get / set / remove / cleanup

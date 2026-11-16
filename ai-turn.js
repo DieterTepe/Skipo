@@ -1,5 +1,5 @@
 // ================================================================
-//  ai-turn.js  –  Skipo 7.0.4   Namensraum: AI
+//  ai-turn.js  –  Skipo 7.0.5   Namensraum: AI
 //  KI-RUNDENABLAUF
 // ----------------------------------------------------------------
 //  Braucht: KONFIG, KI_PLANNER, KI_STUFEN, Settings, State, Rules,
@@ -20,6 +20,7 @@
 //
 //  Stufen: AI.taktik() liefert den Wertesatz der gewählten
 //  Schwierigkeit (KI_STUFEN) – null bei „Leicht" (keine Blockade).
+//  In „Profi" wählt discard() die Ablage per Vorausspielen (AI.Look).
 // ================================================================
 
 const AI = {
@@ -337,6 +338,7 @@ const AI = {
     const keepJoker = !!(T && T.JOKER_KEEP) && handCards.some(c => c.type !== 'joker');
 
     let bestDiscardIndex = -1, bestHandIndex = -1, bestScore = -Infinity;
+    const options = [];                      // alle Möglichkeiten (für das Vorausspielen in „Profi")
 
     for (let h = 0; h < handCards.length; h++) {
       const card        = handCards[h];
@@ -394,12 +396,29 @@ const AI = {
         // Joker oben auf der Ablage nicht verdecken
         if (topCard && topCard.type === 'joker') score -= KONFIG.JOKER_PROTECT_DISCARD_PENALTY;
 
+        options.push({ h, i, score, key: (card.type === 'joker' ? 'J' : card.value) + '>' +
+                       (topCard ? (topCard.type === 'joker' ? 'J' : topCard.value) + ':' + pile.length : 'leer') });
         if (score > bestScore) {
           bestScore        = score;
           bestDiscardIndex = i;
           bestHandIndex    = h;
         }
       }
+    }
+
+    // Profi: die besten Möglichkeiten vorausspielen und die mit dem besten Durchschnitt nehmen
+    if (T && T.LOOK_OPTIONS > 1 && !AI.Look.active && options.length > 1) {
+      options.sort((a, b) => b.score - a.score);          // stabil: die heuristische Wahl bleibt vorn
+      const seen = new Set(), top = [];
+      for (const o of options) {
+        if (seen.has(o.key)) continue;                    // gleiche Karte auf gleichartigen Stapel nur einmal
+        seen.add(o.key); top.push(o);
+        if (top.length >= T.LOOK_OPTIONS) break;
+      }
+      const k = await AI.Look.choose(top, o => Rules.playToDiscard('ai', 'hand', o.h, o.i),
+                                     { samples: T.LOOK_SAMPLES, depth: T.LOOK_DEPTH, ms: T.LOOK_MS });
+      if (this.over()) return;
+      bestHandIndex = top[k].h; bestDiscardIndex = top[k].i;
     }
 
     if (bestHandIndex >= 0 && bestDiscardIndex >= 0) {

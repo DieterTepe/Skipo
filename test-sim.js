@@ -3,7 +3,7 @@
 //  test-sim.js  –  Skipo   REGEL-PRÜFSTAND (nur Node, nicht im Spiel)
 // ----------------------------------------------------------------
 //  Aufruf:   node test-sim.js [Spiele] [Seed] [--ref=ORDNER]
-//                             [--stufe=easy|medium|hard] [--planung=super|normal]
+//                             [--stufe=easy|medium|hard|pro] [--planung=super|normal]
 //  Beispiel: node test-sim.js 300 7 --ref=../skipo-ref
 //
 //  Was passiert:
@@ -14,8 +14,10 @@
 //       tracking ist damit ein sofortiger Fehler.
 //    2. Ein deterministischer „Mensch-Bot" spielt gegen die KI. Der
 //       Zufall (nur das Mischen) kommt aus einem Seed-Generator.
-//    3. Für jede Kombination aus Schwierigkeit (Leicht/Mittel/Schwer)
-//       und KI-Planung (Superstark/Normal) – ohne Angabe alle sechs:
+//    3. Für jede Kombination aus Schwierigkeit (Leicht/Mittel/Schwer/Profi)
+//       und KI-Planung (Superstark/Normal) – ohne Angabe alle acht.
+//       „Profi" spielt voraus und ist rund 30-mal langsamer; dort läuft
+//       deshalb nur ein Zehntel der Spiele (mindestens 10):
 //       Invarianten je Zug: 156 Karten, Baustapel aufsteigend, Hand ≤ 5,
 //       KI legt höchstens EINE Karte je Zug ab, Spiel endet.
 //    4. Mit --ref=ORDNER: Dieselben Spiele laufen zusätzlich mit dem
@@ -38,7 +40,7 @@ const GAMES = parseInt(nums[0] || '100', 10);
 const SEED  = parseInt(nums[1] || '1', 10);
 const DIR   = __dirname;
 const REF   = opt('ref') ? path.resolve(opt('ref')) : null;
-const LEVELS    = opt('stufe')   ? [opt('stufe')]   : ['easy', 'medium', 'hard'];
+const LEVELS    = opt('stufe')   ? [opt('stufe')]   : ['easy', 'medium', 'hard', 'pro'];
 const PLANNINGS = opt('planung') ? [opt('planung')] : ['super', 'normal'];
 
 // ── Seed-Zufall (mulberry32) ──
@@ -84,6 +86,8 @@ function makeEngine(dir) {
   vm.runInContext(`
     Settings.load(); I18n.init(); Tracking.init();
     Clock.pause = () => Promise.resolve();
+    // Vorausspielen ohne Zeitgrenze, damit jeder Lauf dasselbe Ergebnis liefert
+    for (const l in KI_STUFEN) if (KI_STUFEN[l] && 'LOOK_MS' in KI_STUFEN[l]) KI_STUFEN[l].LOOK_MS = 0;
     globalThis.__log = [];
     globalThis.__humanReady = false;
     Events.on('move:build',   d => __log.push(d.player + ':' + d.source + ':' + (d.card.type === 'joker' ? 'J' : d.card.value) + '>B' + d.pile));
@@ -92,6 +96,8 @@ function makeEngine(dir) {
     Events.on('turn:change',  d => { if (d.player === 'human') __humanReady = true; });
     globalThis.__api = {
       setup(level, planning) { Settings.level = level; Settings.planning = planning; },
+      knows(level)    { return Settings.LEVELS.includes(level); },
+      looksAhead(level) { const t = KI_STUFEN[level]; return !!(t && t.LOOK_OPTIONS > 1); },
       start(rng)      { Rules.random = rng; return Flow.startGame(); },
       over()          { return State.turn.over; },
       result()        { return State.turn.result; },
@@ -212,7 +218,7 @@ async function main() {
   const t0 = Date.now();
   const engNew = makeEngine(DIR);
   const engRef = REF ? makeEngine(REF) : null;
-  console.log(`Skipo Regel-Prüfstand – ${GAMES} Spiele je Kombination, Seed ${SEED}`);
+  console.log(`Skipo Regel-Prüfstand – ${GAMES} Spiele je Kombination (Profi: ein Zehntel), Seed ${SEED}`);
   console.log(`  geprüft:  ${engNew.page} (${engNew.files.length} Skripte)`);
   if (engRef) console.log(`  Maßstab:  ${engRef.page} in ${REF} (${engRef.files.length} Skripte)`);
 
@@ -220,10 +226,13 @@ async function main() {
   const samples = [];
   for (const level of LEVELS) {
     for (const planning of PLANNINGS) {
+      if (!engNew.api.knows(level)) { console.log(`  ${level}: unbekannte Stufe – übersprungen`); continue; }
       engNew.api.setup(level, planning);
-      if (engRef) engRef.api.setup(level, planning);
+      const ref   = engRef && engRef.api.knows(level) ? engRef : null;      // Maßstab kennt die Stufe evtl. noch nicht
+      const games = engNew.api.looksAhead(level) ? Math.max(10, Math.round(GAMES / 10)) : GAMES;
+      if (ref) ref.api.setup(level, planning);
       let aiWins = 0, humanWins = 0, moves = 0, stuck = 0, bad = 0, diffs = 0;
-      for (let g = 0; g < GAMES; g++) {
+      for (let g = 0; g < games; g++) {
         const seed = SEED * 1000003 + g;
         const rNew = await playGame(engNew, seed, true);
         if (rNew.invariant) { bad++; if (bad <= 3) console.log(`  ❌ ${level}/${planning} Spiel ${g}: ${rNew.invariant}`); }
@@ -231,8 +240,8 @@ async function main() {
         if (rNew.result) { if (rNew.result.winner === 'ai') aiWins++; else humanWins++; }
         moves += rNew.log.length;
 
-        if (engRef) {
-          const rRef = await playGame(engRef, seed, false);
+        if (ref) {
+          const rRef = await playGame(ref, seed, false);
           const a = rNew.log, b = rRef.log;
           let firstDiff = -1;
           const n = Math.max(a.length, b.length);
@@ -247,7 +256,7 @@ async function main() {
         }
       }
       errors += bad + stuck; diffsTotal += diffs;
-      const cmp = engRef ? (diffs === 0 ? '  ✅ Zug für Zug gleich' : `  ❌ ${diffs} Spiele weichen ab`) : '';
+      const cmp = ref ? (diffs === 0 ? '  ✅ Zug für Zug gleich' : `  ❌ ${diffs} Spiele weichen ab`) : (engRef ? '  (neu, kein Vergleich)' : '');
       console.log(`  ${(level + '/' + planning).padEnd(14)} Züge ${String(moves).padStart(6)}  KI-Siege ${String(aiWins).padStart(4)}  Bot ${String(humanWins).padStart(4)}` +
                   `  Regelfehler ${bad}  festgefahren ${stuck}${cmp}`);
     }

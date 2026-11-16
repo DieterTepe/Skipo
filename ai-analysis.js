@@ -1,5 +1,5 @@
 // ================================================================
-//  ai-analysis.js  –  Skipo 7.0.4   Namensraum: AI.Analysis
+//  ai-analysis.js  –  Skipo 7.0.5   Namensraum: AI.Analysis
 //  GEGNER-VORHERSAGE, BLOCKADE-LAGE, JOKER-STRATEGIE, HAND-KETTEN
 // ----------------------------------------------------------------
 //  Braucht: AI, KONFIG, State, Rules     Bietet: AI.Analysis.*

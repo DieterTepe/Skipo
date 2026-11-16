@@ -1,5 +1,5 @@
 // ================================================================
-//  core-flow.js  –  Skipo 7.0.4   Namensraum: Flow
+//  core-flow.js  –  Skipo 7.0.5   Namensraum: Flow
 //  SPIELSCHLEIFE: Start, Spielerwechsel, Spielende
 // ----------------------------------------------------------------
 //  Braucht: State, Rules, Events, I18n, Clock, AI     Bietet: Flow.*

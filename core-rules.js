@@ -1,5 +1,5 @@
 // ================================================================
-//  core-rules.js  –  Skipo 7.0.4   Namensraum: Rules
+//  core-rules.js  –  Skipo 7.0.5   Namensraum: Rules
 //  SPIELREGELN, DECK, VERTEILEN, ZUGAUSFÜHRUNG
 // ----------------------------------------------------------------
 //  Braucht: State, Events, I18n     Bietet: Rules.*

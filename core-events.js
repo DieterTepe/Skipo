@@ -1,5 +1,5 @@
 // ================================================================
-//  core-events.js  –  Skipo 7.0.4   Namensraum: Events
+//  core-events.js  –  Skipo 7.0.5   Namensraum: Events
 //  MINI-EREIGNISBUS
 // ----------------------------------------------------------------
 //  Braucht: nichts        Bietet: Events.on / off / emit
@@ -45,8 +45,15 @@ const Events = (function () {
       if (i >= 0) list.splice(i, 1);
     },
 
+    /**
+     * true = alle Ereignisse werden verschluckt. Nur das Vorausspielen der KI (AI.Look) setzt das,
+     * damit Probezüge im kopierten Spiel weder Anzeige noch Statistik auslösen.
+     */
+    muted: false,
+
     /** Ereignis senden – synchron, in Registrierungs-Reihenfolge. */
     emit(name, data) {
+      if (this.muted) return;
       const list = listeners.get(name);
       if (!list || list.length === 0) return;
       for (const fn of list.slice()) {

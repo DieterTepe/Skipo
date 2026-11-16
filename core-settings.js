@@ -1,5 +1,5 @@
 // ================================================================
-//  core-settings.js  –  Skipo 7.0.4   Namensräume: Settings, Clock
+//  core-settings.js  –  Skipo 7.0.5   Namensräume: Settings, Clock
 //  PERSISTENTE EINSTELLUNGEN + PAUSENUHR
 // ----------------------------------------------------------------
 //  Braucht: Store, Events     Bietet: Settings.*, Clock.pause/after
@@ -23,11 +23,11 @@ const Settings = {
     speed:   0,                          // Sekunden je Pauseneinheit, 0–2 in 0,1-Schritten
     bg:      { h: 130, s: 60, l: 19 },   // bisheriges Grün (#1B5E20)
     nameSet: false,                      // false → Einstellungen beim ersten Start zeigen
-    level:    'hard',                    // KI-Schwierigkeit: 'easy' | 'medium' | 'hard'
+    level:    'hard',                    // KI-Schwierigkeit: 'easy' | 'medium' | 'hard' | 'pro'
     planning: 'super'                    // KI-Planung: 'super' (mit verdeckten eigenen Stockkarten) | 'normal'
   },
 
-  LEVELS:    ['easy', 'medium', 'hard'],
+  LEVELS:    ['easy', 'medium', 'hard', 'pro'],
   PLANNINGS: ['super', 'normal'],
   SPEED_MAX: 2,
 
@@ -94,8 +94,12 @@ const Settings = {
 };
 
 const Clock = {
+  /** true = keine Pausen (das Vorausspielen der KI rechnet ohne Wartezeit). */
+  instant: false,
+
   /** Pause von Settings.speed × mult Sekunden (Promise). */
   pause(mult = 1) {
+    if (this.instant) return Promise.resolve();
     const ms = Settings.speed * mult * 1000;
     return new Promise(resolve => setTimeout(resolve, ms));
   },

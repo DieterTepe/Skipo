@@ -1,5 +1,5 @@
 // ================================================================
-//  app.js  –  Skipo 7.0.4   Namensraum: App
+//  app.js  –  Skipo 7.0.5   Namensraum: App
 //  START: Einstellungen laden, Module verdrahten, Spiel beginnen
 // ----------------------------------------------------------------
 //  Braucht: alles     Bietet: App.init()

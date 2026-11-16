@@ -1,5 +1,5 @@
 // ================================================================
-//  ui-menu.js  –  Skipo 7.0.4   Namensraum: Menu
+//  ui-menu.js  –  Skipo 7.0.5   Namensraum: Menu
 //  ⚙️-SCHNELLMENÜ UND MENÜAKTIONEN
 // ----------------------------------------------------------------
 //  Braucht: Events, I18n, Tracking, Overlays     Bietet: Menu.init()

@@ -1,5 +1,5 @@
 // ================================================================
-//  ui-render.js  –  Skipo 7.0.4   Namensraum: Render
+//  ui-render.js  –  Skipo 7.0.5   Namensraum: Render
 //  ANZEIGE: Karten, Felder, Stapel, Meldung, KI-Marker, Hintergrund
 // ----------------------------------------------------------------
 //  Braucht: State, Rules, Events, I18n, Settings     Bietet: Render.*

@@ -1,5 +1,5 @@
 // ================================================================
-//  ui-input.js  –  Skipo 7.0.4   Namensraum: Input
+//  ui-input.js  –  Skipo 7.0.5   Namensraum: Input
 //  SPIELER-EINGABE: Auswahl, Ablegen, Long-Press, verschiebbare Infozeile
 // ----------------------------------------------------------------
 //  Braucht: State, Flow, Events, I18n, Overlays     Bietet: Input.init()
