@@ -79,7 +79,7 @@ const I18n = {
     btnApply:     { de:'Übernehmen', en:'Apply', pt:'Aplicar' },
     btnClose:     { de:'Schließen', en:'Close', pt:'Fechar' },
     phName:       { de:'Spielername', en:'Player name', pt:'Nome do jogador' },
-    speedLabel:   { de:'Pause je Schritt (0–2 s)', en:'Pause per step (0–2 s)', pt:'Pausa por passo (0–2 s)' },
+    speedLabel:   { de:'Pause (0–2 s)', en:'Pause (0–2 s)', pt:'Pausa (0–2 s)' },
     // ── KI-Schwierigkeit + KI-Planung ──
     kiLevelLabel: { de:'Schwierigkeit', en:'Difficulty', pt:'Dificuldade' },
     kiLevel_easy: { de:'Leicht', en:'Easy', pt:'Fácil' },

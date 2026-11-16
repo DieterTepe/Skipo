@@ -1,111 +1,101 @@
-# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.3
+# Projekt Skipo (Skip-Bo Mobile) – Projektstand 7.0.4
 
 > **Zweck dieser Datei:** Übergabe-Dokument. Wer einen neuen Chat startet, liest
 > zuerst diese Datei und weiß sofort, was Stand, Regeln, Entscheidungen und
 > nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
-**Letzte Aktualisierung:** 14.11.2026 — **7.0.3 ist live** (von Dieter freigegeben, `main`).
-Stärkere KI (68,5 % gegen 7.0.2) plus Einstellungen **Schwierigkeit** (Leicht / Mittel /
-Schwer, Standard Schwer) und **KI-Planung** (Superstark / Normal, Standard Superstark).
-Vor der Freigabe geprüft: Regel-Prüfstand für alle sechs Kombinationen, Browsertest
-(Fenster, Speichern, Sprachen, vier Spiele). Dieters Live-Test steht noch aus.
+**Letzte Aktualisierung:** 15.11.2026 — **7.0.4 liegt fertig auf dem Zweig `v7.0.4`** und
+wartet auf Dieters Freigabe. Live (`main`) ist bis dahin 7.0.3. 7.0.4 ist die
+Aufräum-Version: Der Ordner enthält nur noch diese eine Version, die KI spielt gleich
+stark wie 7.0.3. Danach geplant: 7.0.5 mit neuen KI-Ideen (Abschnitt 7).
 
 ---
 
 ## 0. Kurzfassung für den schnellen Einstieg
 
-- **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_3.html` – GitHub Pages,
-  Repo `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.3`.
-  `SkipBo_7_0_2.html` und `SkipBo_7_0_1.html` sind seit 14.11.2026 nur noch Weiterleitungen
-  auf die aktuelle Startseite.
-- **Architektur (seit 7.0.1):** vier Schichten (core → ai → flow/tracking → ui), ein
-  Namensraum je Datei, Ereignisbus, Meldungsschlüssel (DE/EN/PT), ein Speicher-Zugang.
-  Kein DOM in core/ai/flow/tracking → alles läuft in Node und ist simulierbar.
-- **KI 7.0.3:** Joker bleiben am Zugende in der Hand, Ablage behält Karten
-  für die eigene Stockkarte, Sicherheitsabstand 3, Handkarte vor Ablagekarte.
-  **68,5 % gegen 7.0.2**, 92,5 % gegen den Bot. Alles Schalter in `ki-taktik.js`; mit den
-  dort genannten Altwerten spielt der Code Zug für Zug wie 7.0.2.
-- **Stufen (7.0.3):** `Settings.level` easy / medium / hard und `Settings.planning`
-  super / normal (Store `skipo.v1.level`, `skipo.v1.planning`). `AI.taktik()` legt
-  `KI_STUFEN[level]` über `KI_TAKTIK`; `AI.fairStock()` steuert den Planer. Abschnitt 6.7.
-- **KI (seit 7.0.2):** Blockade-Taktik in `ki-taktik.js` – die KI verweigert Züge, die
-  einen Baustapel für die sichtbare Gegner-Stockkarte öffnen, und hebt Joker für
-  Planer-Ketten auf. Gemessen: **59 % Siegrate gegen 7.0.1**, 80 % gegen den Bot (7.0.1: 73 %).
-  `KI_TAKTIK.ENABLED = false` → Verhalten exakt wie 7.0.1/7.0.0.
-- **Auswertung (seit 7.0.2):** Endscreen zeigt beide Seiten im Vergleich (Spieler vs. KI)
-  plus Hinweis; darunter weiterhin die 5-Spiele-Tuner-Auswertung.
-- **Zwei Prüfstände (Node):** `test-sim.js` (Regeln unverändert? Äquivalenz gegen 7.0.0)
-  und `tune-sim.js` (KI stärker? KI gegen KI, gepaarte Spiele). Nach jeder Änderung laufen lassen.
-- **Referenzen bleiben im Repo:** 6.6.0 (`SkipBo_6_6_0.html`) und 7.0.0
-  (`SkipBo_7_0_0.html` + state/engine/view/ai/endgame.js). Die 7.0.0-JS-Dateien braucht
-  `test-sim.js` – nicht löschen. `SkipBo_7_0_1.html` und `SkipBo_7_0_2.html` sind Weiterleitungen (siehe oben).
-- Sprachen: DE, EN, PT. Ukrainisch entfallen (04.09.2026).
+- **Spiel:** `https://dietertepe.github.io/Skipo/SkipBo_7_0_4.html` – GitHub Pages, Repo
+  `DieterTepe/Skipo`, alle Dateien **flach** im Ordner, absolute URLs mit `?v=7.0.4`.
+  Die alten Adressen `SkipBo_7_0_2.html` und `SkipBo_7_0_3.html` leiten weiter.
+- **Architektur:** vier Schichten (core → ai → flow/tracking → ui), ein Namensraum je
+  Datei, Ereignisbus, Meldungsschlüssel (DE/EN/PT), ein Speicher-Zugang. Kein DOM in
+  core/ai/flow/tracking → alles läuft in Node und ist simulierbar.
+- **KI:** drei Stufen (Leicht / Mittel / **Schwer** = Standard) und zwei Planungsarten
+  (**Superstark** = Standard / Normal), wählbar in den Einstellungen. Alle Zahlen der KI
+  stehen in **einer** Datei `ai-config.js`.
+- **Stärke im echten Spiel (Dieter, 15.11.2026):** Schwer + Superstark gewinnt gegen einen
+  sehr starken Menschen rund 70 %. Die Abstufung der Stufen passt.
+- **Zwei Prüfstände (Node):** `test-sim.js` prüft die Regeln und vergleicht Zug für Zug
+  gegen einen älteren Stand; `tune-sim.js` misst die Stärke (KI gegen KI). **Nach jeder
+  Änderung beide laufen lassen.**
+- **Ablauf für Änderungen:** Claude baut und testet auf einem Zweig `vX.Y.Z`, Dieter sagt
+  „freigeben", erst dann geht es nach `main` (= live). Abschnitt 6.
+- Sprachen: DE, EN, PT.
 
 ---
 
-## 1. Dateisatz 7.0.2 / 7.0.3 (Ladereihenfolge = Abhängigkeit)
+## 1. Dateien (Ladereihenfolge = Abhängigkeit)
 
 ```
-Skipo/  (Repo-Wurzel, GitHub Pages, flach)
-│
-│  ── Konfiguration ──
-├── konfig.js            let KONFIG      Tuner-Werte SCORE_* – NUR dieser Block wird vom Tuner ersetzt (unverändert seit 6.6.0)
-├── ki-planner.js        const KI_PLANNER Planer-Konfiguration (unverändert)
-├── ki-taktik.js         let KI_TAKTIK   Taktik-Schalter (Blockade 7.0.2, Joker/Ablage/Abstand/Quelle 7.0.3) – vom Tuner nicht berührt
+Skipo/  (Repo-Wurzel, GitHub Pages, flach)                                         Zeilen
 │
 │  ── core: Fundament, KEIN DOM ──
-├── core-events.js       Events    on / off / emit – Ereignisbus (Liste der Ereignisse im Dateikopf)
-├── core-store.js        Store     get / set / remove / migrate – EIN Zugang zu localStorage (Präfix skipo.v1.)
-├── core-settings.js     Settings  name · lang · speed · bg · nameSet · THEMES, load / set
-│                        Clock     pause(mult) / after(ms, fn)
-├── core-i18n.js         I18n      t(key, …) / say(key, …) / setLang, Wörterbuch T (DE/EN/PT)
-├── core-state.js        State     game · turn · reset() · player(p) · opponent(p)
-├── core-rules.js        Rules     Deck, shuffle (Rules.random), deal, newGame, isValidBuild, isPileComplete,
-│                                  clearPile, hasAnyBuildMove, playToBuild, playToDiscard, drawToFive,
-│                                  winner, winnerByStock
+├── core-events.js    Events    on / off / emit – Ereignisbus (Liste im Dateikopf)      61
+├── core-store.js     Store     get / set / remove / cleanup – EIN Zugang zu            76
+│                               localStorage (Präfix skipo.v1.)
+├── core-settings.js  Settings  name · lang · speed · bg · nameSet · level · planning  107
+│                               load / set / cleanSpeed, THEMES
+│                     Clock     pause(mult) / after(ms, fn)
+├── core-i18n.js      I18n      t(key, …) / say(key, …) / setLang, Wörterbuch T        337
+├── core-state.js     State     game · turn · reset() · player(p) · opponent(p)         45
+├── core-rules.js     Rules     Deck, shuffle (Rules.random), deal, newGame,           220
+│                               isValidBuild, nextNeeded, clearPile, hasAnyBuildMove,
+│                               playToBuild, playToDiscard, drawToFive, winner,
+│                               winnerByStock
 │
 │  ── ai: KI, KEIN DOM ──
-├── ai-turn.js           AI        takeTurn · prepare · executeMoves · finish · stockAttack · discard · jokerCover
-│                                  + over() / taktik() / say() / note() / cardLabel / srcLabel / reasonText
-├── ai-planner.js        AI.Planner  snapshot · hash · moves · apply · search · riskCheck · runChains · executeChain
-├── ai-eval.js           AI.Eval     candidates · scoreHand · jokerOnBuild · scoreStock · scoreDiscard · dedup
-│                                    · filter · applyThreat · jokerFutureValue · gapSize · futureRisk
-│                                    · dynamicPriorities · blockingPotential · canRemoveStockCard
-│                                    · neededForStock · opponentCritical
-├── ai-analysis.js       AI.Analysis predictEnemyStock · threat · enemyTarget · consecutiveDiscards
-│                                    · discardPatterns · blockScore · jokerStockTop · jokerHand
-│                                    · jokerProtectDiscard · jokerCombo · jokerBestDiscard · jokerFollowUps
-│                                    · handCombo · handComboCache · discardLookAhead · discardComboDepth
-│                                    · discardSimChain
+├── ai-config.js      KI_STUFEN · KI_PLANNER · KONFIG – alle Zahlen der KI, reine Daten 130
+├── ai-turn.js        AI        takeTurn · prepare · executeMoves · moveRound ·         425
+│                               stockPriority · finish · discard
+│                               + over() / taktik() / fairStock() / knownStock()
+├── ai-planner.js     AI.Planner  snapshot · moves · apply · search('stock'|'clear') · 307
+│                               riskCheck · runChains · executeChain
+├── ai-eval.js        AI.Eval     candidates · scoreHand/Stock/Discard · filter ·      422
+│                               applyBlockade · Einzelbewertungen
+├── ai-analysis.js    AI.Analysis predictEnemyStock · threat · usefulForStock ·        315
+│                               jokerStockTop · jokerHand · jokerCombo · handCombo
 │
 │  ── flow + tracking, KEIN DOM ──
-├── core-flow.js         Flow      startGame · idle · checkEnd · humanCanAct · humanBuild · humanDiscard · _aiRound
-├── tracking.js          Tracking  stats (Tuner) · game/last/history (Vergleich beider Seiten) · averages()
+├── core-flow.js      Flow      startGame · humanBuild · humanDiscard · _aiRound ·     129
+│                               checkEnd (Auto-Pass, Notwertung)
+├── tracking.js       Tracking  Zähler beider Seiten je Spiel, last, history (10),      98
+│                               averages()
 │
-│  ── ui: Oberfläche (liest State/Tracking, hört Events, ruft Flow/Settings/I18n) ──
-├── ui-render.js         Render    init · all · hand · stock · drawPile · buildPiles · discardPiles · borders
-│                                  · labels · message · predictionMarkers · background · enable
-├── ui-input.js          Input     init · onClick · toggleSelect · placeOnBuild · tapOwnDiscard · highlight
-│                                  · clear · enableDraggableLabel (Long-Press → Overlays.infoWindow)
-├── ui-menu.js           Menu      init · toggle · close · texts · actions{settings, design, rules, lang,
-│                                  newgame, tuner-reset, imprint, privacy, close}
-├── ui-overlays.js       Overlays  init · texts · showSettings · hideSettings · showDesign · syncDesign
-│                                  · showLanguage · showEnd · compareHTML · tunerAnalysisHTML · infoWindow
-├── app.js               App       init (Settings → I18n → Tracking → Render/Input/Menu/Overlays → Flow)
+│  ── ui: Oberfläche ──
+├── ui-render.js      Render    all · hand · stock · buildPiles · discardPiles ·       255
+│                               message · predictionMarkers · background
+├── ui-input.js       Input     delegierter Klick, Auswahl, Long-Press, Infozeile      228
+├── ui-menu.js        Menu      Schnellmenü, actions (data-action)                      77
+├── ui-overlays.js    Overlays  Einstellungen (Name, Stufe, Planung, Tempo, Regeln),   366
+│                               Design, Sprache, Endscreen mit Vergleich, Info-Fenster
+├── app.js            App       init(), VERSION                                         41
 │
-│  ── Werkzeuge (nur Node, nicht im HTML geladen) ──
-├── test-sim.js          Invarianten + Äquivalenz gegen 7.0.0 (Abschnitt 5)
-├── tune-sim.js          KI gegen KI: Konfigurationsvergleich, Sweep, Bot (Abschnitt 6)
+│  ── Seiten ──
+├── SkipBo_7_0_4.html     Startseite: DOM-Gerüst, keine onclick=, keine Inline-Styles
+├── SkipBo_7_0_2.html     Weiterleitung auf die Startseite (alte Adresse)
+├── SkipBo_7_0_3.html     Weiterleitung auf die Startseite (alte Adresse)
+├── style.css             alle Stile                                                   958
+├── impressum.html / datenschutz.html    „Zurück"-Link auf die Startseite
 │
-├── SkipBo_7_0_3.html    DOM-Gerüst (aktuell), alle ?v=7.0.3
-├── SkipBo_7_0_2.html    Weiterleitung auf SkipBo_7_0_3.html (meta refresh + location.replace + Link)
-│                        ursprünglich: DOM-Gerüst, keine onclick=, keine Inline-Styles, Script-Tags in obiger Reihenfolge
-├── style.css            CSS (Karten, Felder, Menü, Overlays, Endscreen, Vergleichstabelle)
-├── impressum.html / datenschutz.html   „Zurück"-Link auf SkipBo_7_0_2.html
-├── Projekt.md           diese Datei
-├── SkipBo_7_0_0.html + state.js engine.js view.js ai.js endgame.js   Referenz 7.0.0 (für test-sim.js nötig)
-└── SkipBo_6_6_0.html    Ur-Referenz
+│  ── Werkzeuge (nur Node, nicht im Spiel geladen) ──
+├── test-sim.js           Regel-Prüfstand                                              271
+├── tune-sim.js           Stärke-Prüfstand                                             207
+├── README.md
+└── Projekt.md            diese Datei
 ```
+
+**Gesichert, aber nicht mehr im Ordner:** Zweig `stand-7.0.3` = letzter Stand vor dem
+Aufräumen (enthält auch 6.6.0, 7.0.0, den Tuner und die 56 Versuchsschalter). Dieter hat
+zusätzlich eine ZIP. Wiederherstellen einer Datei: `git show stand-7.0.3:DATEI`.
 
 ---
 
@@ -118,10 +108,19 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
    `localStorage` (außer in `Store`). Die Prüfstände laden sie in Node ohne DOM.
 4. **Meldungen sind Schlüssel.** `I18n.say('aiBuild', karte, quelle, 2, 1500)`.
    Neue Meldung = ein Eintrag in `core-i18n.js` mit de/en/pt.
-5. **Ein Store, ein Präfix.** Alle Werte unter `skipo.v1.*` (name, lang, speed, bg,
-   nameSet, tuner, stats).
+5. **Ein Store, ein Präfix.** Alle Werte unter `skipo.v1.*`: name, lang, speed, bg,
+   nameSet, level, planning, stats.
 6. **Ein Render-Einstieg.** `Render.all()` nach jeder Zustandsänderung; danach Ereignis
    `render` (Input wendet die Auswahl-Markierung neu an).
+
+Dazu zwei KI-Regeln seit 7.0.4:
+
+7. **Alle Zahlen der KI stehen in `ai-config.js`.** Kein Wert im Code, der eine Stufe
+   ausmacht. Stufenunterschiede nur über `AI.taktik()` (liefert `KI_STUFEN[stufe]`,
+   `null` bei Leicht).
+8. **Eigener Stock nur über `AI.knownStock()`.** Jede Stelle, die mehr als die oberste
+   eigene Stockkarte braucht, fragt dort. So gilt „Normal" (nur die oberste Karte ist
+   bekannt) überall gleich. Gegnerhand und Nachziehstapel liest die KI nie.
 
 ---
 
@@ -130,245 +129,220 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)
 | Vorhaben | Wo |
 |---|---|
 | Neue Statusmeldung | `core-i18n.js` Eintrag (de/en/pt) → `I18n.say('key', …)` |
-| Neuer Menüpunkt | Button `data-action="x"` in HTML → `Menu.actions.x()` → Text `qmX` in I18n + `Menu.texts()` |
-| Neue Einstellung (persistent) | `Settings.DEFAULTS` ergänzen → `Settings.set('key', wert)` → Hörer auf `settings:change` |
-| Regeländerung | nur `core-rules.js`; danach `node test-sim.js 300 42 --new-only --taktik` (Invarianten) |
-| **KI-Änderung** | Schalter/Wert in `ki-taktik.js` → Code in `ai-*.js` hinter `AI.taktik()` → `node tune-sim.js --games=1000 T:SCHALTER=true` → übernehmen nur bei > 53 % (±2) → `node test-sim.js 300 42` muss weiterhin „identisch" melden (Taktik AUS) |
+| Neuer Menüpunkt | Button `data-action="x"` in der Startseite → `Menu.actions.x()` → Text `qmX` in I18n + `Menu.texts()` |
+| Neue Einstellung (persistent) | `Settings.DEFAULTS` + Prüfung in `Settings.load()` → `Settings.set('key', wert)` → Hörer auf `settings:change` |
+| Regeländerung | nur `core-rules.js`; danach `node test-sim.js 300 42` |
+| **KI-Wert ändern** | `ai-config.js` → `node tune-sim.js --games=2000 S:KEY=WERT` (bzw. `P:` / `K:`) → übernehmen nur bei > 53 % mit zweitem Seed → `node test-sim.js 300 42` |
+| **Neue KI-Idee** | Wert in `KI_STUFEN.hard` (und `medium` mit dem „Aus"-Wert) → Code in `ai-*.js` hinter `AI.taktik()` → messen wie oben. Wirkungslose Ideen wieder **entfernen**, nicht als toten Schalter liegen lassen; Ergebnis in Abschnitt 5 notieren |
+| Umbau ohne Verhaltensänderung | vorher Maßstab anlegen (`git worktree add ../skipo-ref stand-7.0.4`), danach `node test-sim.js 2000 41 --ref=../skipo-ref` → muss „Zug für Zug gleich" melden |
 | Neues Overlay | `ui-overlays.js` Methode + CSS-Klassen in `style.css` (keine Inline-Styles) |
-| Sound / Statistik / Schwierigkeitsgrad | neue Datei, hört auf `move:*`, `game:over`, `turn:change`; Init in `app.js` |
-| Release | alle `?v=` in der HTML gemeinsam hochzählen; neue Version = neue HTML-Datei; die bisherige Startdatei durch eine Weiterleitung ersetzen (Vorlage: `SkipBo_7_0_2.html`), weil alte HTML-Dateien dieselben JS-Dateien laden und sonst die neue KI mit altem Titel zeigen |
+| Sound o. ä. | neue Datei, hört auf `move:*`, `game:over`, `turn:change`; Init in `app.js`; Script-Tag in der Startseite (die Prüfstände lesen die Skriptliste von dort) |
+| **Release** | Abschnitt 6 |
 
 ---
 
-## 4. Abweichungen gegenüber 7.0.0 (geprüft)
+## 4. Die KI
 
-**Spielverhalten ohne Taktik (Basis, identisch bewiesen bis auf):**
-- KI hört **sofort** auf, wenn ein Stock leer ist (7.0.0 spielte nach dem Siegzug weiter,
-  Sieger/Punkte unverändert). `test-sim.js` schneidet deshalb nach dem Siegzug ab.
-- Legt der Mensch seine letzte Handkarte, zieht nur er nach (7.0.0: auch die KI).
-- **Auto-Pass:** keine Handkarte und kein Bauzug → Zug geht an die KI; dreimal beidseitig
-  → Notwertung `Rules.winnerByStock()` (7.0.0: Spiel hing).
-- Nur Karten im eigenen Bereich wählbar; Spielername wird gespeichert.
+### 4.1 Ablauf eines KI-Zugs (`ai-turn.js`)
+1. `prepare()` – auf 5 Karten ziehen, Blockade-Marker setzen.
+2. `executeMoves()` – Runden aus: Joker oben im Stock → **Planer** (`runChains`: erst
+   Stock-Ketten, dann Hand-leeren-Ketten) → **Kandidatenschleife** (jeder weitere
+   erlaubte Einzelzug, bester zuerst). Spielt die Stock-Priorität eine Stockkarte,
+   beginnt die Runde neu – ohne nachzuziehen.
+3. `finish()` – Joker am Zugende behandeln, **genau eine Ablage**, nachziehen.
 
-**Mit Taktik (7.0.2, Standard):** siehe Abschnitt 6 – die KI verweigert öffnende Züge
-und spielt Joker nicht mehr über die Heuristik. Sie lässt also manchmal eine passende
-Karte auf der Hand – Absicht, kein Fehler.
+Die KI spielt jeden Zug, der nach `AI.Eval.filter()` übrig bleibt. Die Bewertung
+(KONFIG) bestimmt nur Reihenfolge, Ablage und in „Leicht" den Joker-Einsatz. Stärke
+entsteht durch **echte Entscheidungen**: Zug verweigern, Joker halten, was ablegen,
+welche Quelle.
 
-**Tuner-Tracking:** Jeder KI-Zug wird einmal gezählt (7.0.0: doppelt). Werte der
-5-Spiele-Auswertung sind daher etwa halb so groß wie früher; Schwellen unverändert.
-Einzelbeobachtungen werden nicht mehr gespeichert.
+### 4.2 Stufen (`KI_STUFEN` in `ai-config.js`, Einstellung `Settings.level`)
 
-**Entfernt (tot/wirkungslos):** `Joker_auf_Ablage`, `evaluateAndSelectMove`,
-`delayWithCallback`, `GESCHWINDIGKEIT`, `getDiscardSequenceBonus`, `deckComposition`,
-`stockPredictions`, Zeitstempel, `faceUp`, Regex-Übersetzer, CSS-Injektion per JS.
-
-**Texte:** Regeltext korrigiert (Langes Drücken; Menü → Spielregeln). Blockade-Tag,
-„Leer" und Joker-Begründungen dreisprachig.
-
----
-
-## 5. Prüfstand 1: test-sim.js – „Sind die Regeln noch dieselben?"
-
-```
-cd Skipo
-node test-sim.js 300 42                        # Taktik AUS: Invarianten + Äquivalenz gegen 7.0.0
-node test-sim.js 300 42 --new-only --taktik    # Taktik AN: nur Invarianten
-node test-sim.js 300 42 --old=../anderer-ordner
-```
-Lädt core/ai/flow/tracking ohne DOM, deterministischer Mensch-Bot gegen die KI, Zufall
-nur beim Mischen (Seed). Invarianten je Zug: 156 Karten, Baustapel 1→12, Hand ≤ 5,
-jedes Spiel endet. Äquivalenz: gleiche Spiele durch die 7.0.0-Engine, Zugfolgen-
-Vergleich. Exit 0 = gleich, 1 = Abweichung mit Beispiel.
-
-**Stand 04.09.2026:** 500 Spiele, 106.250 Züge, alle Zugfolgen identisch (Taktik AUS);
-Taktik AN: 0 Invarianten-Fehler. Zusätzlich: 573 Namensraum-Verweise lösen sich auf,
-alle Sprachschlüssel dreisprachig, alle IDs/Klassen/data-actions vorhanden, Browser-Test
-(Chrome headless, 390×844) 61 Prüfungen bestanden, 0 Konsolenfehler.
-
----
-
-## 6. Prüfstand 2: tune-sim.js – „Ist die KI stärker?"
-
-```
-node tune-sim.js --games=500                      # Kontrolle A gegen A → exakt 50 %
-node tune-sim.js --games=1000 T:AVOID_OPEN=true   # B = KI_TAKTIK-Schalter (ENABLED wird gesetzt)
-node tune-sim.js --games=1000 K:SCORE_42=0        # B = KONFIG-Änderung
-node tune-sim.js --games=1000 P:MAX_DEPTH=20      # B = KI_PLANNER-Änderung
-node tune-sim.js --games=1000 --bot               # B gegen den einfachen Bot
-node tune-sim.js --games=300 --sweep              # jeden KONFIG-Wert ×0 / ×0.5 / ×2 → tune-results.jsonl
-```
-A = aktueller Stand mit `KI_TAKTIK.ENABLED = false`. Jedes Spiel läuft zweimal (gleiche
-Karten, Sitze getauscht) → Kartenglück und Anfangsvorteil heben sich auf. ~60 Spiele/s.
-Ausgabe: Siegrate von B mit 95-%-Intervall, Stockdifferenz, Züge. Für den Sitz „human"
-werden Spielerobjekte und Ablage-Historie getauscht – Spielcode bleibt unberührt.
-**Übernahmeregel:** ≥ 2000 Spiele, > 53 % bei ±2, mit zweitem Seed bestätigt.
-
-### 6.1 Befund: Die Tuner-Werte entscheiden fast nichts
-Sweep über alle 71 KONFIG-Werte: **54 ohne jede messbare Wirkung**, Rest ≤ ±3 Punkte
-(Rauschen). Grund: Die KI spielt **jeden** gültigen Zug – Scores sortieren nur die
-Reihenfolge. Der Planer macht ≈ 53 % aller Züge. KI_PLANNER-Werte: ebenfalls ohne Wirkung.
-Einzige Bestätigung: SCORE_42 = 0 (52,9 % ± 2,2) → in 7.0.2 als `JOKER_HEURISTIC:false`.
-Alte Blockade-Logik (`getOpponentCriticalNumbers` rechnet V+1 statt V−1; Stock-Attacke
-wartet auf 60 % Konfidenz, Vorhersage erreicht max. ~12 %) war praktisch inaktiv;
-bleibt aus Tuner-Kompatibilität unverändert.
-
-### 6.2 Was wirkt: Züge verweigern
-| Maßnahme (1000–2000 Spiele) | Siegrate B |
+| Stufe | Was die KI tut |
 |---|---|
-| Score-Malus/-Bonus, Joker-Zudecken, Planer-Bevorzugung, Gegner-Ablagekarten meiden | 50 % |
-| **AVOID_OPEN** – Karte V−1 nicht spielen (immer; Limit 12: 53,7, Limit 6: 51,5) | 53–54 % |
-| + **AVOID_SECOND** (V−2 nicht, wenn Brücke V−1 sichtbar) | 55–57 % |
-| + **JOKER_HEURISTIC:false** | **58,6 % / 59,2 %** (zwei Seeds) |
-| Gesamt gegen einfachen Bot | **80,3 %** (7.0.1: 73,0 %) |
+| **Leicht** `easy` | keine Blockade; Joker werden über die Heuristik gespielt |
+| **Mittel** `medium` | Blockade: Karte V−1 nicht spielen (V = sichtbare Stockkarte des Gegners), außer die KI kann selbst mit V oder Joker zudecken; V−2 nicht bei sichtbarer Brücke. Joker nur in Planer-Ketten, am Zugende nur mit Folgekarten |
+| **Schwer** `hard` (Standard) | zusätzlich: Joker am Zugende behalten und nie ablegen (`JOKER_KEEP`), Ablage behält Karten für die eigene Stockkarte und legt Doppelte zuerst ab (`DISC_KEEP_USEFUL`, `DISC_DUP`), Sicherheitsabstand 3 (`AVOID_DIST`), Handkarte vor Ablagekarte (`PREFER_HAND`) |
 
-Standardwerte in `ki-taktik.js` = diese Einstellung. Nicht wirksame Schalter stehen
-dort auf 0/false, dokumentiert für spätere Versuche. Stellschraube, falls die KI zu
-hart ist: `AVOID_OPEN_LIMIT` (kleiner = blockt nur im Endspiel).
+**KI-Planung** (`Settings.planning`): **Superstark** `super` (Standard) rechnet mit allen
+Karten des eigenen Stocks, auch den verdeckten. **Normal** `normal` kennt nur die oberste –
+wie der Mensch. Gilt in jeder Stufe und seit 7.0.4 an jeder Stelle der KI.
 
-### 6.4 Versuche 14.11.2026 – Dieters Spielideen (Zweig `ki-versuche`, alle Schalter aus)
-Gemessen mit `--basis` (A = 7.0.2 mit Blockade), 2000 Paare je Variante, Seed 1.
-Zähler-Check: Jeder Schalter greift tatsächlich (siehe Spalte „greift").
+Bedienung: Einstellungen → zwei Schaltergruppen mit Erklärzeile; gilt erst mit
+„Übernehmen", dann ab dem nächsten KI-Zug. Der Endscreen zeigt die gespielte Stärke.
+Die 10-Spiele-Durchschnitte im Endscreen mischen Spiele verschiedener Stufen.
 
-| Idee / Schalter in `ki-taktik.js` | greift | gegen 7.0.2 | gegen Bot (7.0.2: 81,8) |
-|---|---|---|---|
-| Kettenbedrohung: Zug meiden, der Gegner-Stock über sichtbare Ablagen erreichbar macht (`CHAIN_AVOID`, `CHAIN_STOCK`) | oft | **46,3 %** (Gegner-Stock ≤5: 49,3) | – |
-| … + Kettenlänge ≥2/3/4 (`CHAIN_LIMIT`) | oft | 44–45 % | – |
-| … nur Kette ≥3, +2 länger, mit eigener Deckkarte erlaubt | selten | 50,8 % | 82,5 % |
-| `CHAIN_STOCK` + eigene Deckkarte erlaubt (`CHAIN_ALLOW_COVER`) | selten | 50,0 % | 81,1 % |
-| Hand leeren bevorzugen (Stockkette bis Hand leer, `PLANNER_PREFER_CLEAR`) | ~1×/Spiel | 50,6 % / 50,4 % (Seed 2, 4000) | 82,5 % |
-| Serienstapel: größere auf kleinere Karte bestrafen (`SERIES_BREAK_PENALTY` 100/400/1500) | 18 % der Ablagen → ⅓ | 49,5 / 49,5 / 50,0 % | 81,3 % |
-| Joker nie verdecken + Joker auf Joker (`JOKER_HARD`, `JOKER_STACK`) | ~0,05×/Spiel | 50,0 % | 81,7 % |
-| **Kombi** Hand leeren + milde Kette (4000 Paare) | | **51,1 % / 51,4 %** (zwei Seeds, ±1,1) | |
+### 4.3 Gemessene Stärke (tune-sim.js, 2000 gepaarte Spiele, Seed 1, Stand 7.0.4)
 
-**Befund:** Keine Idee erreicht die Übernahmeschwelle (> 53 %). Züge zu verweigern lohnt
-sich nur bei der direkten Öffnung (V−1, `AVOID_OPEN`); jede weitere Verweigerung kostet
-mehr Tempo als sie blockt. Ablage-Ordnung und Jokerschutz sind schon nahe am Optimum
-(Joker wird bereits fast nie verdeckt). Die Kombi bringt reproduzierbar ≈ +1 Punkt –
-echt, aber im Spiel kaum spürbar. Diese Schalter bleiben aus (Stand danach: Abschnitt 6.5).
-Prüfstand: neue Option `--basis` (A = aktuelle Taktik statt Taktik aus).
-
-### 6.5 Versuchsreihe 2 (14.11.2026) → Version 7.0.3
-Auftrag: „Prüfe das Gesamte, ob nicht doch noch eine Stellschraube zu finden ist."
-Vorgehen: jede Stelle, an der die KI wirklich **entscheidet** (nicht nur sortiert),
-als Schalter gebaut und gemessen. ~75 Messungen, 2000–4000 Paare, `--basis`.
-
-**Was gefunden wurde (in dieser Reihenfolge zur Basis gemacht):**
-
-| Stellschraube | Schalter (Altwert) | Gewinn |
-|---|---|---|
-| **Joker am Zugende behalten.** 7.0.2 spielte einen übrigen Hand-Joker am Zugende einzeln auf einen Baustapel (≈1,3 Joker je Spieler und Spiel verschenkt) oder legte ihn zusätzlich zur normalen Karte ab. | `JOKER_END:'keep'` (`'legacy'`), `JOKER_END_DIRECT:false` (`true`) | 59,9 % / 59,3 % gegen 7.0.2 |
-| **Ablage: Karten für die eigene Stockkarte behalten**, Doppelte zuerst ablegen | `DISC_KEEP_USEFUL:1500` (0), `DISC_DUP:600` (0) | +4 (54,0 % allein) |
-| **Sicherheitsabstand 3** zur Gegner-Stockkarte (V−2, V−3 auch ohne Brücke) | `AVOID_DIST:3` (1) | +2 (zusammen mit Ablage 57,0 %) |
-| **Handkarte vor Ablagekarte**, wenn beide dieselbe Karte bieten | `PREFER_SRC:'hand'` (`''`) | 53,7 / 53,5 / 52,8 % (drei Seeds); `'discard'`: 46,7 % |
-| **Gesamt 7.0.3 gegen 7.0.2** (4000 Paare) | | **68,9 % / 68,1 %** (±1,0) |
-| Gesamt gegen einfachen Bot | | **92,5 %** (7.0.2: 81,8 %) |
-
-**Zwei Befunde, die keine Spielstärke-, sondern Regelfragen sind:**
-- **Doppelablage (Fehler in 7.0.2):** In ≈ jedem zweiten Spiel legte die KI zwei Karten in
-  einem Zug ab (normale Karte + Joker „sichern"). Vor 7.0.2 trat das nicht auf, weil die
-  Joker vorher verspielt wurden. Mit `JOKER_END:'keep'` behoben; `test-sim.js` prüft jetzt
-  als Invariante „KI legt höchstens 1× je Zug ab" (36 342 Züge: immer genau 1).
-- **Verdeckte eigene Stockkarten:** Der Planer (`AI.Planner.snapshot/moves`) rechnet seit
-  6.6.0 mit allen Karten des eigenen Stockstapels, also auch den verdeckten. Schalter
-  `PLANNER_FAIR_STOCK:true` plant nur mit der sichtbaren obersten: kostet 3,5–4 Punkte
-  (65,5 % / 64,5 % statt 68,9 % / 68,1 % gegen 7.0.2; Bot 91,3 %). **Entschieden
-  (Dieter, 14.11.2026): als Einstellung „KI-Planung" wählbar, Standard Superstark**
-  (Abschnitt 6.7). Auf Gegnerhand und Nachziehstapel greift die KI nirgends zu (geprüft).
-
-**Dieters Hypothese „dem Gegner das Legen verwehren → er zieht weniger nach":** direkt
-gemessen und klar widerlegt. Leerlaufzüge zurückhalten: alle −13, nur Hand −21, nur
-Ablage −2, nur Richtung eigener Stock −10 bis −13 Punkte. Die eigenen Karten loszuwerden
-(und nachzuziehen) ist weit mehr wert, als dem Gegner Anlegestellen zu nehmen. Was vom
-Gedanken trägt, ist der Sicherheitsabstand (AVOID_DIST) – er verweigert nur wenige Züge.
-
-**Ohne Gewinn (Werte stehen in `ki-taktik.js` als Kommentar):** Joker parken / Überschuss
-spielen / Joker-Budget je Kette, Hand-leeren-Ketten ohne Joker, Rundlauf 12→1, Wettlauf-
-Ausnahme, Abstand 4–6 (+1 / +1 / ±0), blockierte Karten ablegen, Deckkarte behalten,
-nützliche Karte nicht verdecken, bald Spielbares behalten, Serienstapel, Kettenbedrohung,
-Planer: offenes Ende meiden / Risikoprüfung immer / mehr Suchknoten und Tiefe / Hand
-leeren bevorzugen / Handkarten zuerst (−1,5).
-
-**Kontrollen:** KI lässt nie eine spielbare Stockkarte liegen (0 von 36 342 Zügen).
-Mit 7.0.3 endet sie in 36 % der Züge mit Joker in der Hand (3+ Joker: 1 %).
-Altwerte im neuen Code = 7.0.2 Zug für Zug (62 322 Züge / 248 Siege identisch).
-Browsertest (Playwright, lokaler Server): komplettes Spiel, 0 Konsolenfehler.
-
-### 6.7 Schwierigkeit und KI-Planung (7.0.3, Einstellungen im Spiel)
-
-| Stufe (`Settings.level`) | Was die KI tut | Technik |
-|---|---|---|
-| **Leicht** `easy` | spielt ohne Blockade (wie 7.0.1) | `AI.taktik()` → `null` |
-| **Mittel** `medium` | blockiert die Gegner-Stockkarte (wie 7.0.2, aber regelkonform: genau eine Ablage) | `KI_TAKTIK` + `KI_STUFEN.medium` |
-| **Schwer** `hard` (Standard) | zusätzlich Joker halten, Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage | `KI_TAKTIK` |
-
-| KI-Planung (`Settings.planning`) | Bedeutung |
+| Vergleich | Siegrate |
 |---|---|
-| **Superstark** `super` (Standard) | Planer rechnet mit den verdeckten Karten des eigenen Stocks (wie seit 6.6.0) |
-| **Normal** `normal` | Planer kennt nur die oberste eigene Stockkarte – wie der Mensch. Gilt in jeder Stufe (`AI.fairStock()`) |
-
-Gemessen (2000 Paare, Seed 1): Mittel gegen altes 7.0.2 **49,6 %** (gleich stark) ·
-Mittel gegen Leicht **58,3 %** · Schwer gegen Mittel **69,8 %** · Schwer gegen Leicht
-**75,3 %** · Normal gegen Superstark: Schwer 45,6 %, Mittel 46,8 %, Leicht 45,8 % ·
-Schwer-Normal gegen Mittel-Superstark **65,6 %**.
-
-Bedienung: Einstellungen (⚙️ → Einstellungen) → zwei Schaltergruppen mit Erklärzeile;
-gilt erst mit „Übernehmen", dann ab dem nächsten KI-Zug (auch mitten im Spiel).
-Der Endscreen zeigt die gespielte Stärke über dem Vergleich. Texte DE/EN/PT
-(`kiLevel_*`, `kiPlan_*`, `kiHintLevel_*`, `kiHintPlan_*`, `kiChanged`).
-Hinweis: Die 10-Spiele-Durchschnitte im Endscreen mischen Spiele verschiedener Stufen.
-Für tune-sim.js erzwingt `KI_TAKTIK.PLANNER_FAIR_STOCK:true` die Planung „Normal".
-
-### 6.6 Offene KI-Ideen (messbar)
-- Ablage: **welche Karte** behalten wirkt (6.5); **wohin** ablegen bisher nicht.
-- Schwierigkeitsstufen sind in 7.0.3 eingebaut (Abschnitt 6.7).
-- Erkenntnis für neue Ideen: Wirkung haben nur echte Entscheidungen (Joker halten,
-  Ablage, Quelle, Verweigern). Score-Verschiebungen sortieren nur.
-- Zweite Stockkarte ist nicht sichtbar → keine Taktik darauf (wäre Schummeln).
+| Mittel gegen Leicht | 58,3 % |
+| Schwer gegen Mittel | 69,8 % |
+| Schwer gegen Leicht | 75,3 % |
+| Normal gegen Superstark (Schwer) | 45,6 % |
+| Schwer + Superstark gegen den einfachen Bot | 92,5 % |
+| **Schwer + Superstark gegen sehr starken Menschen (Dieter, echt)** | **≈ 70 %** |
 
 ---
 
-## 7. Entscheidungen (fest)
+## 5. Was gemessen wurde (damit nichts doppelt probiert wird)
 
-- Namensraum-Objekte; sauberer Neuaufbau; Claude testet intern, Dieter bekommt fertige Sätze.
-- Sprachen DE/EN/PT; online-only (kein PWA); kein echtes SKIP-BO-Logo; Querformat später.
-- 6.6.0 und 7.0.0 bleiben als Referenz; 7.0.0-JS wird vom Prüfstand gebraucht.
-- KONFIG/KI_PLANNER unverändert (Tuner-Schnittstelle). Neue KI-Werte nur in `ki-taktik.js`.
-- Maßstab für KI-Änderungen ist die gemessene Siegrate in tune-sim.js, nicht die
-  5-Spiele-Auswertung (die beschreibt nur, hat keinen Vergleichsmaßstab).
+Wirkung haben nur echte Entscheidungen. Verschobene Bewertungszahlen sortieren nur.
+
+**Wirksam (alles in „Schwer" enthalten; Punkte = Siegrate über 50 %):**
+
+| Entscheidung | Gewinn |
+|---|---|
+| Karte V−1 nicht spielen, V−2 nicht bei sichtbarer Brücke, Joker nicht über die Heuristik (= Mittel) | +9 gegen Leicht |
+| Joker am Zugende in der Hand behalten (statt einzeln verspielen oder zusätzlich ablegen) | +10 |
+| Ablage: Karten für die eigene Stockkarte behalten, Doppelte zuerst | +4 |
+| Handkarte statt Ablagekarte, wenn beide dieselbe Karte bieten (umgekehrt −3,3) | +3,5 |
+| Sicherheitsabstand 3 statt 1 (4 und 5: +1, 6: ±0) | +2 |
+| Planer rechnet mit verdeckten eigenen Stockkarten (= Superstark) | +4 |
+
+**Ohne Gewinn oder schädlich (wieder entfernt):**
+
+| Idee | Ergebnis |
+|---|---|
+| **Karten zurückhalten, damit der Gegner weniger anlegen kann** (alle Leerlaufzüge −13, nur Hand −21, nur Ablage −2, nur Richtung eigener Stock −10 bis −13) | stark negativ: eigene Karten loswerden und nachziehen ist viel mehr wert |
+| Kettenbedrohung: Zug meiden, nach dem der Gegner über seine sichtbaren Ablagen an die Stockkarte kommt | −4; mit Deckkarten-Ausnahme ±0 |
+| Joker auf die Ablage parken / ab N Jokern einen frei spielen / Joker-Budget je Kette 1, 3, 5 | −2,5 bis ±0 |
+| Offenen Stapel mit Joker zudecken; Joker zählt nicht als Deckkarte; Hand-leeren-Ketten ohne Joker | ±0 bis +0,9 |
+| Joker auf der Ablage nie verdecken, Joker auf Joker (passiert ohnehin nur 1× in 20 Spielen) | ±0 |
+| Serienstapel (größere auf kleinere Karte bestrafen) – greift bei 18 % der Ablagen | ±0 |
+| Nützliche oder bald spielbare Karte nicht verdecken; bald Spielbares behalten; gleiche Werte stapeln | ±0 |
+| Blockierte Karte zuerst ablegen (300: +1; 1000: −3); Deckkarte behalten | ±0 |
+| Rundlauf 12→1 beachten; Wettlauf-Ausnahme bei kleinem eigenem Stock (−0,8 / −1,7) | ±0 / negativ |
+| Planer: offenes Kettenende meiden, Risikoprüfung immer, mehr Suchknoten/Tiefe, Hand leeren bevorzugen, Handkarten zuerst (−1,5) | ±0 |
+| 71 Tuner-Werte einzeln ×0 / ×0,5 / ×2 | 54 ohne jede Wirkung, Rest Rauschen |
+
+**Aufräumen 7.0.4 – was dabei belegt wurde:**
+- 31 der 71 KONFIG-Werte änderten in keiner Stufe einen Zug; 20 davon waren im Code
+  nachweislich tot und sind entfernt (Tiefenanalyse der Ablage, alte Blockade-Muster mit
+  Gewicht 0, Debug-Schalter, ein Grundwert, der allen Möglichkeiten gleich zugeschlagen
+  wurde, unbenutzte Werte). 51 bleiben.
+- In 9000 gezählten Spielen griffen nie: Stock-Attacke (braucht 60 % Vorhersage, erreicht
+  ~12 %), doppelte Ablage in Leicht. Die Stock-Priorität griff 1×; ihr Neustart zog dabei
+  regelwidrig mitten im Zug nach → jetzt ohne Nachziehen.
+- Die KI lässt nie eine spielbare Stockkarte liegen (0 von 36 000 Zügen).
+
+---
+
+## 6. Prüfstände und Release
+
+### 6.1 test-sim.js – „Stimmen die Regeln? Hat der Umbau etwas verändert?"
+```
+node test-sim.js 300 7                          # alle sechs Kombinationen, je 300 Spiele
+node test-sim.js 2000 41 --ref=../skipo-ref     # zusätzlich Zug für Zug gegen einen Maßstab
+node test-sim.js 300 7 --stufe=hard --planung=super
+```
+Lädt genau die Skripte der Startseite (ohne ui-*.js, app.js) in eine Sandbox ohne DOM.
+Deterministischer Mensch-Bot gegen die KI, Zufall nur beim Mischen (Seed). Invarianten:
+156 Karten, Baustapel aufsteigend, Hand ≤ 5, **KI legt höchstens eine Karte je Zug ab**,
+Spiel endet. Mit `--ref` läuft dasselbe Spiel mit einem älteren Stand; jede Abweichung
+wird mit Zugnummer gezeigt. Rückgabewert 1 bei Fehler.
+Per `require('./test-sim.js')` liefert die Datei `makeEngine`, `playGame` für eigene
+Auswertungen (so arbeitet auch tune-sim.js).
+
+**Nachweis 7.0.4:** 12 000 Spiele (2,5 Mio. Züge) Zug für Zug gleich mit 7.0.3 in allen
+sechs Kombinationen. Danach eine gewollte Änderung: „Normal" gilt auch in der Zugbewertung
+(Regel 8). Neu gegen alt gemessen: Schwer 50,0 %, Mittel 50,0 %, Leicht 51,6 %.
+„Superstark" ist weiterhin Zug für Zug gleich mit 7.0.3 (4500 Spiele).
+
+### 6.2 tune-sim.js – „Ist die KI stärker?"
+```
+node tune-sim.js --games=500                       # Kontrolle A = B → exakt 50 %
+node tune-sim.js --games=2000 S:AVOID_DIST=4       # Schwer mit Abstand 4 gegen Schwer
+node tune-sim.js --games=2000 --a=medium/super     # Schwer gegen Mittel
+node tune-sim.js --games=2000 --b=hard/normal      # Normal gegen Superstark
+node tune-sim.js --games=2000 K:SCORE_15=200 A:P:MAX_NODES=20000
+node tune-sim.js --games=1000 --bot                # gegen den einfachen Bot
+node tune-sim.js --games=300 --sweep               # jeden KONFIG-Wert ×0 / ×0.5 / ×2
+```
+Zwei Seiten A und B, jede = Stufe/Planung + Änderungen (`S:` Stufenwert, `P:` Planer,
+`K:` KONFIG; Vorsatz `A:` für Seite A). Jedes Spiel läuft zweimal mit getauschten Sitzen →
+Kartenglück und Anfangsvorteil heben sich auf. ~65 Spiele/s.
+**Übernahmeregel:** ≥ 2000 Paare, > 53 %, mit zweitem Seed bestätigt.
+**Grenze:** KI gegen KI. Was ein Mensch anders ausnutzt, zeigt nur das echte Spiel.
+
+### 6.3 Release-Ablauf (GitHub)
+Claude hat Schreibzugriff auf `DieterTepe/Skipo`. `main` = GitHub Pages = live.
+Marken (Tags) lässt die Verbindung nicht zu → Stände werden als Zweig `stand-x.y.z` gesichert.
+
+1. Zweig `vX.Y.Z` von `main`. Neue Startseite `SkipBo_X_Y_Z.html`, alle `?v=` gemeinsam
+   hochzählen, `App.VERSION`, Zurück-Links in impressum/datenschutz, README.
+2. Die bisherige Startseite durch eine Weiterleitung ersetzen (Kopie von
+   `SkipBo_7_0_3.html`), in **allen** Weiterleitungen das Ziel neu setzen. Grund: Alle
+   Startseiten laden dieselben JS-Dateien; eine alte Seite zeigte sonst die neue KI mit
+   altem Titel.
+3. Prüfen: `test-sim.js`, `tune-sim.js`, Browsertest (Playwright mit lokalem Server,
+   URLs auf `http://127.0.0.1:PORT/Skipo/` umgeschrieben).
+4. Zweig pushen (nichts ist live). Dieter um Freigabe fragen.
+5. Nach „freigeben": Fast-Forward nach `main`, pushen, Zweig `stand-X.Y.Z` anlegen.
+6. Projektordner (claude.ai-Projekt) mit denselben Dateien aktualisieren.
+
+**Grenzen:** Ein Zweig lässt sich nicht im Browser vorab testen (Pages zeigt nur `main`).
+Ob Pages ausliefert, kann Claude nicht abfragen → Dieter öffnet die Adresse einmal.
+
+---
+
+## 7. Nächste Schritte
+
+**7.0.5 – KI-Ideen (besprochen am 15.11.2026):**
+1. **Wahrscheinlichkeiten (Dieters Idee).** Fertige Baustapel werden sofort
+   zurückgemischt, die unbekannten Karten sind also immer „alle minus die sichtbaren" –
+   die KI muss sich nichts merken. Erwartung: 1–3 Punkte. Das Zählen allein verschiebt
+   wenig (Grundwahrscheinlichkeit, dass der Gegner eine bestimmte Karte oder einen Joker
+   hält: grob 57 %). Wertvoller: **was der Gegner nicht gelegt hat**, obwohl er konnte.
+   Beste Anwendung: Blockade nur verweigern, wenn das Risiko wirklich hoch ist, statt
+   starr drei Karten Abstand.
+2. **Vorausspielen (Claudes Idee).** Unbekannte Karten viele Male zufällig austeilen, die
+   nächsten Züge durchspielen, das im Schnitt Beste wählen. Größter möglicher Hebel,
+   größter Aufwand, Rechenzeit auf dem Handy. Erst im Prüfstand messen, nur bei klarem
+   Gewinn fürs Spiel bauen.
+3. Bei 70 % gegen einen sehr starken Menschen ist ein großer Teil des Rests Kartenglück.
+   Offen: Soll eine stärkere KI „Schwer" ersetzen oder eine vierte Stufe werden?
+
+**Ideenpool (Reihenfolge = Vorschlag):** Soundeffekte · Spielerstatistik erweitern
+(Siegesserie, Verlauf; Basis `Tracking.history`) · Farbenblind-Modus · weitere
+Kartenrückseiten · Pass-and-Play · interaktives Tutorial · Querformat-Seitenpanel.
+
+---
+
+## 8. Entscheidungen (fest)
+
+- Namensraum-Objekte; Claude testet, Dieter gibt frei. Jede Änderung bekommt eine neue
+  Versionsnummer und eine neue Startseite (keine feste Adresse – Dieter verwaltet externe
+  Kopien nach Versionsnummer).
+- Der Ordner enthält nur die aktuelle Version (seit 7.0.4). Vorversionen werden nicht
+  mehr unterstützt; gespeicherte Altdaten werden beim Start gelöscht, nicht übernommen.
+- Der externe Tuner wird nicht mehr benutzt; die Tuner-Auswertung im Spiel ist entfernt.
+  Maßstab für KI-Änderungen ist allein die gemessene Siegrate.
+- Stufen Leicht / Mittel / Schwer und Planung Superstark / Normal; Standard Schwer +
+  Superstark. Die Abstufung passt (Dieter, 15.11.2026).
+- Tempo 0–2 s in 0,1-Schritten, Standard 0 (mehr nur zum Nachvollziehen oder für Laien).
+- Aufräumen und KI-Stärke nie in derselben Version (sonst ist unklar, woher eine
+  Änderung der Stärke kommt).
+- Sprachen DE/EN/PT; online-only (kein PWA); kein echtes SKIP-BO-Logo.
 - Neues Spiel = Seitenreload; `Flow.startGame()` ist zusätzlich in-page-fähig.
-- **GitHub-Ablauf (seit 14.11.2026):** Claude hat Schreibzugriff auf das Repo `DieterTepe/Skipo`
-  (flach, Zweig `main` = GitHub Pages = live). Jede Änderung bekommt eine neue Versionsnummer
-  (neue `SkipBo_x_y_z.html`, alle `?v=` gemeinsam hochzählen, `App.VERSION`, Zurück-Links in
-  impressum/datenschutz). Claude testet im Prüfstand, pusht auf einen Zweig `vX.Y.Z` (nichts live),
-  Dieter prüft und sagt „freigeben“, erst dann Übernahme nach `main`. Die alte Version bleibt als
-  Rückfall liegen. Nie direkt auf `main` ohne Freigabe.
-
----
-
-## 8. Ideenpool (Reihenfolge = Vorschlag)
-
-1. Soundeffekte (hört auf `move:*` / `pile:cleared` / `game:over`, Aus-Schalter in Settings)
-2. ~~Schwierigkeitsgrade~~ – erledigt in 7.0.3 (Abschnitt 6.7)
-3. Spielerstatistik erweitern (Siegesserie, Verlauf; Basis `Tracking.history` liegt schon)
-4. Farbenblind-Modus (CSS-Klasse am body)
-5. Weitere Kartenrückseiten (Design-Bedienfeld)
-6. Pass-and-Play (zweiter Mensch statt AI in `Flow._aiRound`)
-7. Interaktives Tutorial
-8. Querformat-Seitenpanel
 
 ---
 
 ## 9. Erkenntnisse / Stolperfallen
 
-- **GitHub-Upload am Handy:** „Etwas ist gewaltig schiefgelaufen…" ist ein GitHub-Glitch;
-  vom Laptop hochladen oder „Add file → Create new file".
+- **Cache:** hart neu laden; die `?v=`-Nummer ist der sichere Weg.
 - **Seite unstyled:** `…/Skipo/style.css` direkt öffnen; Dateiname exakt, flach.
-- **Cache:** hart neu laden; `?v=`-Nummer ist der sichere Weg.
-- **Geister-KI:** gelöst durch `AI.busy` + awaited Rekursion + `AI.over()` an jedem `await`.
-  In-Page-Neustart nur über `Flow.startGame()` (setzt `turn.over`, wartet `AI.busy` ab).
-- **Hintergrundläufe in der Claude-Sandbox** werden beendet, wenn der Aufruf endet →
-  lange Sweeps in Portionen (`--from=N`, fertige Messungen werden übersprungen).
-- **Playwright:** gewählte Karten schweben (Animation) → Klicks mit `force`.
+- **Geister-KI:** `AI.busy` + `AI.over()` nach jedem `await`. In-Page-Neustart nur über
+  `Flow.startGame()` (setzt `turn.over`, wartet `AI.busy` ab).
+- **Farbwechsel im Einstellungsfenster** (`hue-rotate` auf dem ganzen Fenster) färbt alle
+  Farben darin um → für Markierungen nur Weiß/Schwarz verwenden.
+- **Tempo 0** heißt: keine Pausen, aber jeder Schritt bleibt asynchron (Browser zeichnet).
+- **Hintergrundläufe in der Claude-Sandbox** enden mit dem Aufruf → lange Messungen in
+  Portionen, zwei Läufe parallel (2 Kerne).
+- **Playwright:** gewählte Karten schweben (Animation) → Klicks mit `force`, oder das
+  Spiel über `Flow.humanBuild` / `Flow.humanDiscard` steuern.
+- **Python-Heredocs mit „deutschen" Anführungszeichen:** Das schließende `"` beendet die
+  Zeichenkette → dreifache Anführungszeichen benutzen.
 
 ---
 
@@ -376,8 +350,9 @@ Für tune-sim.js erzwingt `KI_TAKTIK.PLANNER_FAIR_STOCK:true` die Planung „Nor
 
 | Version | Datum | Inhalt |
 |---|---|---|
-| 6.6.0 | 06/2026 | Einzeldatei, Zugketten-Planer, Tuner-Werte Gen 188 |
-| 7.0.0 | 16.06.2026 | Aufteilung in HTML + CSS + 7 JS, verhaltensgleich |
-| 7.0.1 | 04.09.2026 | Neuarchitektur (Schichten, Namensräume, Events, I18n-Schlüssel, Store); Äquivalenz bewiesen; live abgenommen |
-| 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Auswertung beider Seiten, tune-sim.js; live, von Dieter ausgiebig getestet (KI-Siegrate ≈ +20 Punkte) |
-| 7.0.3 | 14.11.2026 | Joker am Zugende behalten (behebt Doppelablage), Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. Einstellungen Schwierigkeit (Leicht/Mittel/Schwer) und KI-Planung (Superstark/Normal). Live seit 14.11.2026 (Freigabe Dieter) |
+| 6.6.0 | 06/2026 | Einzeldatei, Zugketten-Planer, Tuner |
+| 7.0.0 | 16.06.2026 | Aufteilung in HTML + CSS + 7 JS |
+| 7.0.1 | 04.09.2026 | Neuarchitektur (Schichten, Namensräume, Ereignisse, Meldungsschlüssel, Store) |
+| 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Vergleich beider Seiten im Endscreen, tune-sim.js |
+| 7.0.3 | 14.11.2026 | Joker am Zugende behalten, Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. Stufen und KI-Planung in den Einstellungen. Echt: ≈ 70 % gegen sehr starken Menschen |
+| 7.0.4 | 15.11.2026 | Aufräumen: nur noch diese Version im Ordner (19 000 → 5 700 Zeilen, KI 2 570 → 1 600), Tuner-Auswertung entfernt, eine KI-Konfigurationsdatei, Tempo 0–2 s (Standard 0), „Normal" gilt überall. KI gleich stark wie 7.0.3. **Zweig `v7.0.4`, wartet auf Freigabe** |
