@@ -4,10 +4,10 @@
 > zuerst diese Datei und weiß sofort, was Stand, Regeln, Entscheidungen und
 > nächste Schritte sind. Bei jeder größeren Änderung aktualisieren.
 
-**Letzte Aktualisierung:** 15.11.2026 — **7.0.4 liegt fertig auf dem Zweig `v7.0.4`** und
-wartet auf Dieters Freigabe. Live (`main`) ist bis dahin 7.0.3. 7.0.4 ist die
-Aufräum-Version: Der Ordner enthält nur noch diese eine Version, die KI spielt gleich
-stark wie 7.0.3. Danach geplant: 7.0.5 mit neuen KI-Ideen (Abschnitt 7).
+**Letzte Aktualisierung:** 16.11.2026 — **7.0.4 ist live** (von Dieter freigegeben, `main`).
+7.0.4 ist die Aufräum-Version: Der Ordner enthält nur noch diese eine Version, die KI
+spielt gleich stark wie 7.0.3. Dieters Live-Test steht noch aus. Danach geplant: 7.0.5
+mit neuen KI-Ideen (Abschnitt 7).
 
 ---
 
@@ -96,6 +96,7 @@ Skipo/  (Repo-Wurzel, GitHub Pages, flach)                                      
 **Gesichert, aber nicht mehr im Ordner:** Zweig `stand-7.0.3` = letzter Stand vor dem
 Aufräumen (enthält auch 6.6.0, 7.0.0, den Tuner und die 56 Versuchsschalter). Dieter hat
 zusätzlich eine ZIP. Wiederherstellen einer Datei: `git show stand-7.0.3:DATEI`.
+Zweig `stand-7.0.4` = Stand dieser Freigabe (Maßstab für den nächsten Umbau).
 
 ---
 
@@ -355,4 +356,4 @@ Kartenrückseiten · Pass-and-Play · interaktives Tutorial · Querformat-Seiten
 | 7.0.1 | 04.09.2026 | Neuarchitektur (Schichten, Namensräume, Ereignisse, Meldungsschlüssel, Store) |
 | 7.0.2 | 04.09.2026 | Blockade-Taktik (59 % gegen 7.0.1), Vergleich beider Seiten im Endscreen, tune-sim.js |
 | 7.0.3 | 14.11.2026 | Joker am Zugende behalten, Ablage nach Nützlichkeit, Abstand 3, Handkarte vor Ablage: 68,5 % gegen 7.0.2. Stufen und KI-Planung in den Einstellungen. Echt: ≈ 70 % gegen sehr starken Menschen |
-| 7.0.4 | 15.11.2026 | Aufräumen: nur noch diese Version im Ordner (19 000 → 5 700 Zeilen, KI 2 570 → 1 600), Tuner-Auswertung entfernt, eine KI-Konfigurationsdatei, Tempo 0–2 s (Standard 0), „Normal" gilt überall. KI gleich stark wie 7.0.3. **Zweig `v7.0.4`, wartet auf Freigabe** |
+| 7.0.4 | 15.11.2026 | Aufräumen: nur noch diese Version im Ordner (19 000 → 5 700 Zeilen, KI 2 570 → 1 600), Tuner-Auswertung entfernt, eine KI-Konfigurationsdatei, Tempo 0–2 s (Standard 0), „Normal" gilt überall. KI gleich stark wie 7.0.3. Live seit 16.11.2026 (Freigabe Dieter) |
